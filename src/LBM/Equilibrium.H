@@ -17,9 +17,9 @@ namespace muphfasa {
 // LatticeTag must be one of the LatticeDescriptor specialisations.
 template <typename LatticeTag>
 void computeEquilibrium(const amrex::Box& box,
-                               amrex::Array4<Real const> const& rho,
-                               amrex::Array4<Real const> const& vel,
-                               amrex::Array4<Real> const& feq_arr);
+                               amrex::Array4<amrex::Real const> const& rho,
+                               amrex::Array4<amrex::Real const> const& vel,
+                               amrex::Array4<amrex::Real> const& feq_arr);
 
 
 // ── MultiFab-level helpers (host-side) ───────────────────────────────────

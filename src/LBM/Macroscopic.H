@@ -19,21 +19,21 @@ namespace muphfasa {
 // rho = sum_q f_q
 template <typename LatticeTag>
 void computeDensity(const amrex::Box& box,
-                    amrex::Array4<const Real> const& f_arr, 
-                    amrex::Array4<Real> const& rho_arr);
+                    amrex::Array4<const amrex::Real> const& f_arr,
+                    amrex::Array4<amrex::Real> const& rho_arr);
 
 // u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q   (alpha = 0..D-1)
 template <typename LatticeTag>
 void computeVelocity(const amrex::Box& box,
-                     amrex::Array4<const Real> const& f_arr,
-                     amrex::Array4<const Real> const& rho_arr,
-                     amrex::Array4<Real> const& vel_arr);
+                     amrex::Array4<const amrex::Real> const& f_arr,
+                     amrex::Array4<const amrex::Real> const& rho_arr,
+                     amrex::Array4<amrex::Real> const& vel_arr);
 
 template <typename LatticeTag>
 void computeVelocity(const amrex::Box& box,
-                     amrex::Array4<const Real> const& f_arr,
-                     amrex::Array4<Real> const& rho_arr,
-                     amrex::Array4<Real> const& vel_arr);
+                     amrex::Array4<const amrex::Real> const& f_arr,
+                     amrex::Array4<amrex::Real> const& rho_arr,
+                     amrex::Array4<amrex::Real> const& vel_arr);
 
 
 // ── MultiFab-level helpers (host-side) ───────────────────────────────────

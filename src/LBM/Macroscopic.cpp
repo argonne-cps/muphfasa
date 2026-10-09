@@ -13,12 +13,12 @@ namespace muphfasa {
 // ── computeDensity ────────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeDensity(const amrex::Box& box,
-                    amrex::Array4<const Real> const& f_arr, 
-                    amrex::Array4<Real> const& rho_arr);
+                    amrex::Array4<const amrex::Real> const& f_arr,
+                    amrex::Array4<amrex::Real> const& rho_arr)
 
 {
     // TODO: return sum_q f[q]
-    ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         rho_arr(i, j, k) = 0.;
         for (int n=0; n < LatticeTag::Q; ++n){
             rho_arr(i, j, k) += f_arr(i, j, k, n);
@@ -30,11 +30,11 @@ void computeDensity(const amrex::Box& box,
 
 template <typename LatticeTag>
 void computeVelocity(const amrex::Box& box,
-                     amrex::Array4<const Real> const& f_arr,
-                     amrex::Array4<const Real> const& rho_arr,
-                     amrex::Array4<Real> const& vel_arr)
+                     amrex::Array4<const amrex::Real> const& f_arr,
+                     amrex::Array4<const amrex::Real> const& rho_arr,
+                     amrex::Array4<amrex::Real> const& vel_arr)
 {
-    ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         // set vel to zero
         for (int idim=0; idim < AMREX_SPACEDIM; ++idim){
             vel_arr(i, j, k, idim) = 0.;
@@ -53,12 +53,12 @@ void computeVelocity(const amrex::Box& box,
         for (int idim=0; idim < AMREX_SPACEDIM; ++idim){
             vel_arr(i, j, k, idim) /= rho_arr(i, j, k);
         }
-});
+    });
 }
 
 
 // ── computeMacroscopic (MultiFab) ─────────────────────────────────────────
-template <int D, int Q>
+template <typename LatticeTag>
 void computeMacroscopic(const amrex::MultiFab& f_mf,
                         amrex::MultiFab&       rho_mf,
                         amrex::MultiFab&       vel_mf)
@@ -66,30 +66,31 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
-    for (MFIter mfi(f_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(f_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const auto tileBox = mfi.tilebox();
 
-        amrex::Array4<Real const> const& f_arr = f_mf[mfi].array();
-        amrex::Array4<Real> const& rho = rho_mf[mfi].const_array();
-        amrex::Array4<Real> const& vel = vel_mf[mfi].const_array();
-        computeDensity(tileBox, f_arr, rho);
-        computeVelocity(tileBox, f_arr, rho, vel);
+        amrex::Array4<amrex::Real const> const& f_arr = f_mf[mfi].const_array();
+        amrex::Array4<amrex::Real> const& rho = rho_mf[mfi].array();
+        amrex::Array4<amrex::Real> const& vel = vel_mf[mfi].array();
+        computeDensity<LatticeTag>(tileBox, f_arr, rho);
+        computeVelocity<LatticeTag>(tileBox, f_arr, rho, vel);
+    }
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
-template amrex::Real computeDensity<2, 9>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<Real> const);
-template amrex::Real computeDensity<3,15>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<Real> const);
-template amrex::Real computeDensity<3,19>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<Real> const);
-template amrex::Real computeDensity<3,27>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<Real> const);
+template void computeDensity<D2Q9>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);
+template void computeDensity<D3Q15>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);
+template void computeDensity<D3Q19>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);
+template void computeDensity<D3Q27>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);
 
-template amrex::Real computeVelocity<2, 9>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<const Real>, amrex::Array4<Real>);
-template amrex::Real computeVelocity<3,15>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<const Real>, amrex::Array4<Real>);
-template amrex::Real computeVelocity<3,19>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<const Real>, amrex::Array4<Real>);
-template amrex::Real computeVelocity<3,27>(const amrex::Box, amrex::Array4<const Real>, amrex::Array4<const Real>, amrex::Array4<Real>);
+template void computeVelocity<D2Q9>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real>);
+template void computeVelocity<D3Q15>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real>);
+template void computeVelocity<D3Q19>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real>);
+template void computeVelocity<D3Q27>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real>);
 
-template void computeMacroscopic<2, 9>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
-template void computeMacroscopic<3,15>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
-template void computeMacroscopic<3,19>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
-template void computeMacroscopic<3,27>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
 
 } // namespace muphfasa

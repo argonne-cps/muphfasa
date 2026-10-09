@@ -13,9 +13,9 @@ namespace muphfasa {
 
 // simple exact streaming in a ParallelFor
 template <typename LatticeTag>
-void default_stream(const amrex::Box& box, 
-                    amrex::Array4<const Real> const& f_in_arr, 
-                    amrex::Array4<Real> const& f_out_arr,);
+void default_stream(const amrex::Box& box,
+                    amrex::Array4<const amrex::Real> const& f_in_arr,
+                    amrex::Array4<amrex::Real> const& f_out_arr);
 
 // Perform the streaming step: f_out(x) <- f_in(x - c_q) for each q.
 // f_in  must have at least one layer of valid ghost cells filled.

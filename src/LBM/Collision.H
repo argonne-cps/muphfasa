@@ -12,7 +12,13 @@
 namespace muphfasa {
 
 // ── Collision model tag types ─────────────────────────────────────────────
-struct BGK {};   // single-relaxation-time
+struct BGK {
+    template <typename LatticeTag>
+    static void collide(const amrex::Box& box,
+                amrex::Array4<amrex::Real> const& f_arr,
+                amrex::Array4<const amrex::Real> const& feq_arr,
+                const amrex::Real omega);
+};   // single-relaxation-time
 struct TRT {};   // two-relaxation-time     (not yet implemented)
 struct MRT {};   // multiple-relaxation-time (not yet implemented)
 
@@ -22,9 +28,9 @@ struct MRT {};   // multiple-relaxation-time (not yet implemented)
 // tau: BGK relaxation time (tau = nu/cs2 + 0.5 in lattice units)
 // f and feq are arrays of length LatticeTag::Q.
 template <typename LatticeTag>
-void BGK::collide(const amrex::Box& box, 
-                amrex::Array4<Real> const& f_arr,
-                amrex::Array4<const Real> const& feq_arr,
+void BGK::collide(const amrex::Box& box,
+                amrex::Array4<amrex::Real> const& f_arr,
+                amrex::Array4<const amrex::Real> const& feq_arr,
                 const amrex::Real omega) noexcept;
 
 // ── MultiFab-level collision (host-side) ─────────────────────────────────

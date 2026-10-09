@@ -14,19 +14,19 @@ namespace muphfasa {
 struct BGK {
 
     template <typename LatticeTag>
-    void BGK::collide(const amrex::Box& box, 
-                amrex::Array4<Real> const& f_arr,
-                amrex::Array4<const Real> const& feq_arr,
+    void collide(const amrex::Box& box,
+                amrex::Array4<amrex::Real> const& f_arr,
+                amrex::Array4<const amrex::Real> const& feq_arr,
                 const amrex::Real omega)
     {
-        ParallelFor(box, LatticeTag::Q, 
+        amrex::ParallelFor(box, LatticeTag::Q,
                     [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
 
             // collide
-            f_arr(i, j, k, n) = (1 - omega) * f_arr + omega * feq_arr;
+            f_arr(i, j, k, n) = (1 - omega) * f_arr(i, j, k, n) + omega * feq_arr(i, j, k, n);
         });
     }
-}
+};
 
 // ── MultiFab-level dispatch ───────────────────────────────────────────────
 template <typename LatticeTag, typename CollisionModel>
@@ -37,20 +37,20 @@ void collide(amrex::MultiFab&       f_mf,
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
-    for (MFIter mfi(f_mf, TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+    for (amrex::MFIter mfi(f_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
         const auto tileBox = mfi.tilebox();
 
-        Array4<Real> const& f_arr= f_mf[mfi].array();
-        Array4<Real const> const& feq_arr = feq_mf[mfi].const_array();
-        CollisionModel::collide(tileBox, f_arr, feq_arr, omega);
+        amrex::Array4<amrex::Real> const& f_arr= f_mf[mfi].array();
+        amrex::Array4<amrex::Real const> const& feq_arr = feq_mf[mfi].const_array();
+        CollisionModel::collide<LatticeTag>(tileBox, f_arr, feq_arr, omega);
     }
 }
 
 // ── Explicit instantiations — BGK ────────────────────────────────────────
-template void BGK::collide<D2Q9>(const amrex::Box&, amrex::Array4<Real> const&, amrex::Array4<const Real> const&, const amrex::Real);
-template void BGK::collide<D3Q15>(const amrex::Box&, amrex::Array4<Real> const&, amrex::Array4<const Real> const&, const amrex::Real);
-template void BGK::collide<D3Q19>(const amrex::Box&, amrex::Array4<Real> const&, amrex::Array4<const Real> const&, const amrex::Real);
-template void BGK::collide<D3Q27>(const amrex::Box&, amrex::Array4<Real> const&, amrex::Array4<const Real> const&, const amrex::Real);
+template void BGK::collide<D2Q9>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);
+template void BGK::collide<D3Q15>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);
+template void BGK::collide<D3Q19>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);
+template void BGK::collide<D3Q27>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);
 
 template void collide<D2Q9, BGK> (amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collide<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
