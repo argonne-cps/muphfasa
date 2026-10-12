@@ -3,6 +3,7 @@
 // for future extension.
 
 #include "Collision.H"
+#include "Equilibrium.H"
 #include "LatticeDescriptor.H"
 #include "Macroscopic.H"
 
@@ -54,8 +55,10 @@ void collideMF(amrex::MultiFab&       f_mf,
 // ── collideFullArr (per-tile kernel) ──────────────────────────────────────
 // rho, u, and f^eq are computed as per-cell scratch registers rather than
 // written to MultiFabs, since nothing downstream of this fused kernel needs
-// them. The equilibrium formula is inlined (matches Equilibrium.cpp) so the
-// velocity components can stay local scalars instead of an Array4 target.
+// them. u and f^eq are computed via the shared computeVelocityCell2D/3D and
+// computeEquilibriumCell2D/3D kernels (GpuArray-based, no Array4 write
+// target needed) so the formulas stay in one place with Macroscopic.cpp and
+// Equilibrium.cpp.
 template <typename LatticeTag, typename CollisionModel>
 void collideFullArr(const amrex::Box& box,
                     amrex::Array4<amrex::Real> const& fstar_arr,
@@ -67,47 +70,20 @@ void collideFullArr(const amrex::Box& box,
         // calc rho
         const amrex::Real rho = computeDensityCell<LatticeTag>(f_arr, i, j, k);
 
-        // calc u
+        // calc u and fstar for each comp in a single merged loop
 #if (AMREX_SPACEDIM == 2)
-        amrex::Real ux = 0.;
-        amrex::Real uy = 0.;
+        const auto u = computeVelocityCell2D<LatticeTag>(f_arr, rho, i, j, k);
         for (int n = 0; n < LatticeTag::Q; ++n) {
-            ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-            uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-        }
-        ux /= rho;
-        uy /= rho;
-        const amrex::Real u_sq = ux * ux + uy * uy;
-#else
-        amrex::Real ux = 0.;
-        amrex::Real uy = 0.;
-        amrex::Real uz = 0.;
-        for (int n = 0; n < LatticeTag::Q; ++n) {
-            ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-            uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-            uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
-        }
-        ux /= rho;
-        uy /= rho;
-        uz /= rho;
-        const amrex::Real u_sq = ux * ux + uy * uy + uz * uz;
-#endif
-
-        // calc feq and fstar for each comp in a single merged loop
-        for (int n = 0; n < LatticeTag::Q; ++n) {
-#if (AMREX_SPACEDIM == 2)
-            const amrex::Real cdotu = LatticeTag::cx(n) * ux + LatticeTag::cy(n) * uy;
-#else
-            const amrex::Real cdotu = LatticeTag::cx(n) * ux + LatticeTag::cy(n) * uy
-                                     + LatticeTag::cz(n) * uz;
-#endif
-            const amrex::Real feq = LatticeTag::weights(n) * rho *
-                (1 + LatticeTag::cs2inv * cdotu
-                   + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
-                   - 0.5 * LatticeTag::cs2inv * u_sq);
-
+            const amrex::Real feq = computeEquilibriumCell2D<LatticeTag>(rho, u, n);
             fstar_arr(i, j, k, n) = CollisionModel::collide(f_arr(i, j, k, n), feq, omega);
         }
+#else
+        const auto u = computeVelocityCell3D<LatticeTag>(f_arr, rho, i, j, k);
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+            const amrex::Real feq = computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+            fstar_arr(i, j, k, n) = CollisionModel::collide(f_arr(i, j, k, n), feq, omega);
+        }
+#endif
     });
 }
 

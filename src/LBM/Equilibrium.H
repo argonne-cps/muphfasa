@@ -6,6 +6,7 @@
 #ifndef MUPHFASA_EQUILIBRIUM_H
 #define MUPHFASA_EQUILIBRIUM_H
 
+#include <AMReX_GpuArray.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
@@ -21,6 +22,21 @@ AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeEquilibriumCell(const amrex::Real rho,
                                    amrex::Array4<amrex::Real const> const& vel,
                                    int i, int j, int k, int n) noexcept;
+
+// GpuArray-based variants: identical math to computeEquilibriumCell, but take
+// u as local scratch (from e.g. computeVelocityCell2D/3D) instead of reading
+// it out of an Array4. For use by fused kernels that have no vel MultiFab.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell2D(const amrex::Real rho,
+                                     amrex::GpuArray<amrex::Real, 2> const& u,
+                                     int n) noexcept;
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell3D(const amrex::Real rho,
+                                     amrex::GpuArray<amrex::Real, 3> const& u,
+                                     int n) noexcept;
 
 // ── array-level kernel ─────────────────────────────────────────────────
 // Returns f^eq for a all velocity directions given rho and u array

@@ -7,6 +7,7 @@
 #ifndef MUPHFASA_MACROSCOPIC_H
 #define MUPHFASA_MACROSCOPIC_H
 
+#include <AMReX_GpuArray.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
@@ -31,6 +32,21 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
                          const amrex::Real rho,
                          amrex::Array4<amrex::Real> const& vel_arr,
                          int i, int j, int k) noexcept;
+
+// GpuArray-returning variants: identical math to computeVelocityCell, but
+// return the velocity as local scratch instead of writing into an Array4.
+// For use by fused kernels that have no MultiFab to write u into.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept;
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept;
 
 // ── Array-level moment kernels ─────────────────────────────────────────────
 // f[q] holds the q-th distribution value for a single cell.

@@ -55,6 +55,39 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
 #endif
 }
 
+// ── computeVelocityCell2D / computeVelocityCell3D ─────────────────────────
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
+        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
+    }
+    return {ux / rho, uy / rho};
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    amrex::Real uz = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
+        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
+        uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
+    }
+    return {ux / rho, uy / rho, uz / rho};
+}
+
 // ── computeDensity ────────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeDensity(const amrex::Box& box,
@@ -111,6 +144,12 @@ template void computeVelocityCell<D2Q9> (amrex::Array4<const amrex::Real> const&
 template void computeVelocityCell<D3Q15>(amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::Array4<amrex::Real> const&, int, int, int);
 template void computeVelocityCell<D3Q19>(amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::Array4<amrex::Real> const&, int, int, int);
 template void computeVelocityCell<D3Q27>(amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::Array4<amrex::Real> const&, int, int, int);
+
+template amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D<D2Q9>(amrex::Array4<const amrex::Real> const&, const amrex::Real, int, int, int);
+
+template amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D<D3Q15>(amrex::Array4<const amrex::Real> const&, const amrex::Real, int, int, int);
+template amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D<D3Q19>(amrex::Array4<const amrex::Real> const&, const amrex::Real, int, int, int);
+template amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D<D3Q27>(amrex::Array4<const amrex::Real> const&, const amrex::Real, int, int, int);
 
 template void computeDensity<D2Q9>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);
 template void computeDensity<D3Q15>(const amrex::Box, amrex::Array4<const amrex::Real>, amrex::Array4<amrex::Real> const);

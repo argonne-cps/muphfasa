@@ -39,6 +39,38 @@ amrex::Real computeEquilibriumCell(const amrex::Real rho,
               - 0.5 * LatticeTag::cs2inv * u_sq);
 }
 
+// ── computeEquilibriumCell2D / computeEquilibriumCell3D ──────────────────
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell2D(const amrex::Real rho,
+                                     amrex::GpuArray<amrex::Real, 2> const& u,
+                                     int n) noexcept
+{
+    const amrex::Real u_sq = u[0] * u[0] + u[1] * u[1];
+    const amrex::Real cdotu = LatticeTag::cx(n) * u[0] + LatticeTag::cy(n) * u[1];
+
+    return LatticeTag::weights(n) * rho *
+           (1 + LatticeTag::cs2inv * cdotu
+              + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
+              - 0.5 * LatticeTag::cs2inv * u_sq);
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell3D(const amrex::Real rho,
+                                     amrex::GpuArray<amrex::Real, 3> const& u,
+                                     int n) noexcept
+{
+    const amrex::Real u_sq = u[0] * u[0] + u[1] * u[1] + u[2] * u[2];
+    const amrex::Real cdotu = LatticeTag::cx(n) * u[0] + LatticeTag::cy(n) * u[1]
+                             + LatticeTag::cz(n) * u[2];
+
+    return LatticeTag::weights(n) * rho *
+           (1 + LatticeTag::cs2inv * cdotu
+              + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
+              - 0.5 * LatticeTag::cs2inv * u_sq);
+}
+
 // ── compute kernel ─────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeEquilibrium(const amrex::Box& box,
@@ -75,6 +107,12 @@ template amrex::Real computeEquilibriumCell<D2Q9> (const amrex::Real, amrex::Arr
 template amrex::Real computeEquilibriumCell<D3Q15>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
 template amrex::Real computeEquilibriumCell<D3Q19>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
 template amrex::Real computeEquilibriumCell<D3Q27>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+
+template amrex::Real computeEquilibriumCell2D<D2Q9>(const amrex::Real, amrex::GpuArray<amrex::Real, 2> const&, int);
+
+template amrex::Real computeEquilibriumCell3D<D3Q15>(const amrex::Real, amrex::GpuArray<amrex::Real, 3> const&, int);
+template amrex::Real computeEquilibriumCell3D<D3Q19>(const amrex::Real, amrex::GpuArray<amrex::Real, 3> const&, int);
+template amrex::Real computeEquilibriumCell3D<D3Q27>(const amrex::Real, amrex::GpuArray<amrex::Real, 3> const&, int);
 
 template void computeEquilibrium<D2Q9> (const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeEquilibrium<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
