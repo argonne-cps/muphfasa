@@ -6,10 +6,21 @@
 #ifndef MUPHFASA_STREAMING_H
 #define MUPHFASA_STREAMING_H
 
+#include <AMReX_GpuQualifiers.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_REAL.H>
 
 namespace muphfasa {
+
+// ── single-cell kernel ─────────────────────────────────────────────────
+// Returns f_in at the upstream node for direction n: f_in(x - c_n, n).
+// Callable directly from GPU device code without an AMReX ParallelFor
+// context (e.g. from unit tests on host).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real streamCell(amrex::Array4<const amrex::Real> const& f_in_arr,
+                       int i, int j, int k, int n) noexcept;
 
 // simple exact streaming in a ParallelFor
 template <typename LatticeTag>
