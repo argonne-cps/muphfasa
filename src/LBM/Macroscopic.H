@@ -13,7 +13,26 @@
 
 namespace muphfasa {
 
-// ── Cell-local moment kernels ─────────────────────────────────────────────
+// ── Single-cell kernels ────────────────────────────────────────────────────
+// Operate on one (i,j,k) cell; callable directly from GPU device code
+// without an AMReX ParallelFor context (e.g. from unit tests on host).
+
+// rho = sum_q f_q, for a single cell.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeDensityCell(amrex::Array4<const amrex::Real> const& f_arr,
+                               int i, int j, int k) noexcept;
+
+// u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q, for a single cell.
+// Writes AMREX_SPACEDIM velocity components into vel_arr(i,j,k,*).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
+                         const amrex::Real rho,
+                         amrex::Array4<amrex::Real> const& vel_arr,
+                         int i, int j, int k) noexcept;
+
+// ── Array-level moment kernels ─────────────────────────────────────────────
 // f[q] holds the q-th distribution value for a single cell.
 
 // rho = sum_q f_q
