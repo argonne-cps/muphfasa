@@ -10,23 +10,31 @@
 
 namespace muphfasa {
 
+// ── streamCell ─────────────────────────────────────────────────────────
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real streamCell(amrex::Array4<const amrex::Real> const& f_in_arr,
+                       int i, int j, int k, int n) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    const int i_old = i - LatticeTag::cx(n);
+    const int j_old = j - LatticeTag::cy(n);
+    return f_in_arr(i_old, j_old, k, n);
+#else
+    const int i_old = i - LatticeTag::cx(n);
+    const int j_old = j - LatticeTag::cy(n);
+    const int k_old = k - LatticeTag::cz(n);
+    return f_in_arr(i_old, j_old, k_old, n);
+#endif
+}
+
 template <typename LatticeTag>
 void default_stream(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& f_in_arr,
                     amrex::Array4<amrex::Real> const& f_out_arr) {
 
     amrex::ParallelFor(box, LatticeTag::Q, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-        // find node to stream from
-        int i_old = i - LatticeTag::cx(n);
-        int j_old = j - LatticeTag::cy(n);
-#if (AMREX_SPACEDIM == 3)
-        int k_old = k - LatticeTag::cz(n);
-#else
-        int k_old = k;
-#endif
-
-        // stream
-        f_out_arr(i, j, k, n) = f_in_arr(i_old, j_old, k_old, n);
+        f_out_arr(i, j, k, n) = streamCell<LatticeTag>(f_in_arr, i, j, k, n);
     });
 }
 
@@ -61,6 +69,11 @@ void streamInPlace(amrex::MultiFab&       f,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
+template amrex::Real streamCell<D2Q9> (amrex::Array4<const amrex::Real> const&, int, int, int, int);
+template amrex::Real streamCell<D3Q15>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
+template amrex::Real streamCell<D3Q19>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
+template amrex::Real streamCell<D3Q27>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
+
 template void default_stream<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void default_stream<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void default_stream<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
