@@ -36,6 +36,20 @@ void collideMF(amrex::MultiFab&       f_mf,
                const amrex::MultiFab& feq_mf,
                amrex::Real            omega);
 
+template <typename LatticeTag, typename CollisionModel>
+void collideFullArr(amrex::MultiFab& f_mf,
+             amrex::MultiFab& feq_mf,
+             amrex::MultiFab& rho_mf,
+             amrex::MultiFab& vel_mf,
+             amrex::Real omega);
+
+template <typename LatticeTag, typename CollisionModel>
+void collideFullMF(amrex::MultiFab& f_mf,
+             amrex::MultiFab& feq_mf,
+             amrex::MultiFab& rho_mf,
+             amrex::MultiFab& vel_mf,
+             amrex::Real omega);
+
 } // namespace muphfasa
 
 #endif // MUPHFASA_COLLISION_H
