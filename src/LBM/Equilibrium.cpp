@@ -10,36 +10,10 @@
 
 namespace muphfasa {
 
-// ── computeEquilibriumCell ────────────────────────────────────────────────
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real computeEquilibriumCell(const amrex::Real rho,
-                                   amrex::Array4<amrex::Real const> const& vel,
-                                   int i, int j, int k, int n) noexcept
-{
-#if (AMREX_SPACEDIM == 2)
-    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
-                            + vel(i, j, k, 1) * vel(i, j, k, 1);
-
-    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
-                             + LatticeTag::cy(n) * vel(i, j, k, 1);
-#else
-    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
-                            + vel(i, j, k, 1) * vel(i, j, k, 1)
-                            + vel(i, j, k, 2) * vel(i, j, k, 2);
-
-    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
-                             + LatticeTag::cy(n) * vel(i, j, k, 1)
-                             + LatticeTag::cz(n) * vel(i, j, k, 2);
-#endif
-
-    return LatticeTag::weights(n) * rho *
-           (1 + LatticeTag::cs2inv * cdotu
-              + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
-              - 0.5 * LatticeTag::cs2inv * u_sq);
-}
-
 // ── computeEquilibriumCell2D / computeEquilibriumCell3D ──────────────────
+// Canonical equilibrium math, taking u as local scratch (no Array4 lookup
+// required). computeEquilibriumCell below is a thin wrapper over these for
+// callers that have u stored in a MultiFab-backed array.
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeEquilibriumCell2D(const amrex::Real rho,
@@ -69,6 +43,23 @@ amrex::Real computeEquilibriumCell3D(const amrex::Real rho,
            (1 + LatticeTag::cs2inv * cdotu
               + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
               - 0.5 * LatticeTag::cs2inv * u_sq);
+}
+
+// ── computeEquilibriumCell ────────────────────────────────────────────────
+// Reads u out of vel(i,j,k,*) and delegates to computeEquilibriumCell2D/3D.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell(const amrex::Real rho,
+                                   amrex::Array4<amrex::Real const> const& vel,
+                                   int i, int j, int k, int n) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    const amrex::GpuArray<amrex::Real, 2> u = {vel(i, j, k, 0), vel(i, j, k, 1)};
+    return computeEquilibriumCell2D<LatticeTag>(rho, u, n);
+#else
+    const amrex::GpuArray<amrex::Real, 3> u = {vel(i, j, k, 0), vel(i, j, k, 1), vel(i, j, k, 2)};
+    return computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+#endif
 }
 
 // ── compute kernel ─────────────────────────────────────────────────────

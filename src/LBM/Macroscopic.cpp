@@ -23,39 +23,10 @@ amrex::Real computeDensityCell(amrex::Array4<const amrex::Real> const& f_arr,
     return rho;
 }
 
-// ── computeVelocityCell ───────────────────────────────────────────────────
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
-                         const amrex::Real rho,
-                         amrex::Array4<amrex::Real> const& vel_arr,
-                         int i, int j, int k) noexcept
-{
-#if (AMREX_SPACEDIM == 2)
-    amrex::Real ux = 0.;
-    amrex::Real uy = 0.;
-    for (int n = 0; n < LatticeTag::Q; ++n) {
-        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-    }
-    vel_arr(i, j, k, 0) = ux / rho;
-    vel_arr(i, j, k, 1) = uy / rho;
-#else
-    amrex::Real ux = 0.;
-    amrex::Real uy = 0.;
-    amrex::Real uz = 0.;
-    for (int n = 0; n < LatticeTag::Q; ++n) {
-        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-        uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
-    }
-    vel_arr(i, j, k, 0) = ux / rho;
-    vel_arr(i, j, k, 1) = uy / rho;
-    vel_arr(i, j, k, 2) = uz / rho;
-#endif
-}
-
 // ── computeVelocityCell2D / computeVelocityCell3D ─────────────────────────
+// Canonical velocity math, returned as local scratch (no Array4 write
+// target required). computeVelocityCell below is a thin wrapper over these
+// for callers that need the result written into a MultiFab-backed array.
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,
@@ -86,6 +57,27 @@ amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex:
         uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
     }
     return {ux / rho, uy / rho, uz / rho};
+}
+
+// ── computeVelocityCell ───────────────────────────────────────────────────
+// Writes the computeVelocityCell2D/3D result into vel_arr(i,j,k,*).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
+                         const amrex::Real rho,
+                         amrex::Array4<amrex::Real> const& vel_arr,
+                         int i, int j, int k) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    const auto u = computeVelocityCell2D<LatticeTag>(f_arr, rho, i, j, k);
+    vel_arr(i, j, k, 0) = u[0];
+    vel_arr(i, j, k, 1) = u[1];
+#else
+    const auto u = computeVelocityCell3D<LatticeTag>(f_arr, rho, i, j, k);
+    vel_arr(i, j, k, 0) = u[0];
+    vel_arr(i, j, k, 1) = u[1];
+    vel_arr(i, j, k, 2) = u[2];
+#endif
 }
 
 // ── computeDensity ────────────────────────────────────────────────────────
