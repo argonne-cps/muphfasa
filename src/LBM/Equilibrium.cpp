@@ -10,6 +10,35 @@
 
 namespace muphfasa {
 
+// ── computeEquilibriumCell ────────────────────────────────────────────────
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell(const amrex::Real rho,
+                                   amrex::Array4<amrex::Real const> const& vel,
+                                   int i, int j, int k, int n) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
+                            + vel(i, j, k, 1) * vel(i, j, k, 1);
+
+    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
+                             + LatticeTag::cy(n) * vel(i, j, k, 1);
+#else
+    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
+                            + vel(i, j, k, 1) * vel(i, j, k, 1)
+                            + vel(i, j, k, 2) * vel(i, j, k, 2);
+
+    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
+                             + LatticeTag::cy(n) * vel(i, j, k, 1)
+                             + LatticeTag::cz(n) * vel(i, j, k, 2);
+#endif
+
+    return LatticeTag::weights(n) * rho *
+           (1 + LatticeTag::cs2inv * cdotu
+              + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
+              - 0.5 * LatticeTag::cs2inv * u_sq);
+}
+
 // ── compute kernel ─────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeEquilibrium(const amrex::Box& box,
@@ -18,24 +47,7 @@ void computeEquilibrium(const amrex::Box& box,
                                amrex::Array4<amrex::Real> const& feq_arr) {
 
         amrex::ParallelFor(box, LatticeTag::Q, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-
-            // calc u squared
-            amrex::Real u_sq = 0.;
-            for (int idim=0; idim < AMREX_SPACEDIM; ++idim){
-                u_sq += vel(i, j, k, idim)*vel(i, j, k, idim);
-            }
-
-            amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
-                                + LatticeTag::cy(n) * vel(i, j, k, 1)
-#if (AMREX_SPACEDIM == 3)
-                                + LatticeTag::cz(n) * vel(i, j, k, 2)
-#endif
-            ;
-
-            feq_arr(i, j, k, n) = LatticeTag::weights(n) * rho(i, j, k) * 
-                                    (1 + LatticeTag::cs2inv * cdotu 
-                                        + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu*cdotu 
-                                        - 0.5 * LatticeTag::cs2inv * u_sq);
+            feq_arr(i, j, k, n) = computeEquilibriumCell<LatticeTag>(rho(i, j, k), vel, i, j, k, n);
         });
 }
 
@@ -59,6 +71,11 @@ void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
+template amrex::Real computeEquilibriumCell<D2Q9> (const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+template amrex::Real computeEquilibriumCell<D3Q15>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+template amrex::Real computeEquilibriumCell<D3Q19>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+template amrex::Real computeEquilibriumCell<D3Q27>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+
 template void computeEquilibrium<D2Q9> (const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeEquilibrium<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeEquilibrium<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
