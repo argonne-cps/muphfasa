@@ -6,6 +6,7 @@
 #include "InputParser.H"
 
 #include <AMReX_ParmParse.H>
+#include <AMReX_Vector.H>
 
 namespace muphfasa {
 
@@ -17,16 +18,19 @@ InputParser::InputParser()
 std::array<int, AMREX_SPACEDIM> InputParser::ncells() const
 {
     amrex::ParmParse pp("grid");
-    std::array<int, AMREX_SPACEDIM> n{};
-    // TODO: pp.getarr("ncells", n, 0, AMREX_SPACEDIM);
-    return n;
+    amrex::Vector<int> n(AMREX_SPACEDIM);
+    pp.getarr("ncells", n, 0, AMREX_SPACEDIM);
+
+    std::array<int, AMREX_SPACEDIM> out{};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { out[d] = n[d]; }
+    return out;
 }
 
 int InputParser::maxGridSize() const
 {
     amrex::ParmParse pp("grid");
     int val = 64;
-    // TODO: pp.query("max_grid_size", val);
+    pp.query("max_grid_size", val);
     return val;
 }
 
@@ -34,7 +38,7 @@ int InputParser::nGhost() const
 {
     amrex::ParmParse pp("grid");
     int val = 1;
-    // TODO: pp.query("n_ghost", val);
+    pp.query("n_ghost", val);
     return val;
 }
 
@@ -42,7 +46,7 @@ int InputParser::maxStep() const
 {
     amrex::ParmParse pp("sim");
     int val = 0;
-    // TODO: pp.get("max_step", val);
+    pp.get("max_step", val);
     return val;
 }
 
@@ -50,7 +54,7 @@ amrex::Real InputParser::stopTime() const
 {
     amrex::ParmParse pp("sim");
     amrex::Real val = -amrex::Real(1.0);
-    // TODO: pp.query("stop_time", val);
+    pp.query("stop_time", val);
     return val;
 }
 
@@ -58,7 +62,7 @@ std::string InputParser::latticeType() const
 {
     amrex::ParmParse pp("lbm");
     std::string val = "D3Q19";
-    // TODO: pp.query("lattice_type", val);
+    pp.query("lattice_type", val);
     return val;
 }
 
@@ -66,7 +70,7 @@ amrex::Real InputParser::tau() const
 {
     amrex::ParmParse pp("lbm");
     amrex::Real val = amrex::Real(1.0);
-    // TODO: pp.query("tau", val);
+    pp.query("tau", val);
     return val;
 }
 
@@ -74,7 +78,7 @@ amrex::Real InputParser::reynoldsNumber() const
 {
     amrex::ParmParse pp("units");
     amrex::Real val = amrex::Real(0.0);
-    // TODO: pp.query("Re", val);
+    pp.query("Re", val);
     return val;
 }
 
@@ -82,22 +86,88 @@ amrex::Real InputParser::machNumber() const
 {
     amrex::ParmParse pp("units");
     amrex::Real val = amrex::Real(0.0);
-    // TODO: pp.query("Ma", val);
+    pp.query("Ma", val);
     return val;
 }
 
-amrex::Real InputParser::refLength()    const { return amrex::Real(1.0); }
-amrex::Real InputParser::refVelocity()  const { return amrex::Real(1.0); }
-amrex::Real InputParser::refViscosity() const { return amrex::Real(1.0e-6); }
-amrex::Real InputParser::refDensity()   const { return amrex::Real(1.0); }
+amrex::Real InputParser::refLength() const
+{
+    amrex::ParmParse pp("units");
+    amrex::Real val = amrex::Real(1.0);
+    pp.query("ref_length", val);
+    return val;
+}
 
-std::string InputParser::geometryType() const { return "box"; }
-bool        InputParser::useEB()        const { return false; }
+amrex::Real InputParser::refVelocity() const
+{
+    amrex::ParmParse pp("units");
+    amrex::Real val = amrex::Real(1.0);
+    pp.query("ref_velocity", val);
+    return val;
+}
 
-int InputParser::plotInterval()       const { return 100; }
-int InputParser::checkpointInterval() const { return 1000; }
+amrex::Real InputParser::refViscosity() const
+{
+    amrex::ParmParse pp("units");
+    amrex::Real val = amrex::Real(1.0e-6);
+    pp.query("ref_viscosity", val);
+    return val;
+}
 
-std::string InputParser::plotfilePrefix()    const { return "plt"; }
-std::string InputParser::checkpointPrefix()  const { return "chk"; }
+amrex::Real InputParser::refDensity() const
+{
+    amrex::ParmParse pp("units");
+    amrex::Real val = amrex::Real(1.0);
+    pp.query("ref_density", val);
+    return val;
+}
+
+std::string InputParser::geometryType() const
+{
+    amrex::ParmParse pp("geometry");
+    std::string val = "box";
+    pp.query("type", val);
+    return val;
+}
+
+bool InputParser::useEB() const
+{
+    amrex::ParmParse pp("geometry");
+    int val = 0;
+    pp.query("use_eb", val);
+    return val != 0;
+}
+
+int InputParser::plotInterval() const
+{
+    amrex::ParmParse pp("amr");
+    int val = 100;
+    pp.query("plot_int", val);
+    return val;
+}
+
+int InputParser::checkpointInterval() const
+{
+    amrex::ParmParse pp("amr");
+    int val = 1000;
+    pp.query("chk_int", val);
+    return val;
+}
+
+std::string InputParser::plotfilePrefix() const
+{
+    amrex::ParmParse pp("amr");
+    std::string val = "plt";
+    pp.query("plot_file", val);
+    return val;
+}
+
+std::string InputParser::checkpointPrefix() const
+{
+    amrex::ParmParse pp("amr");
+    std::string val = "chk";
+    pp.query("check_file", val);
+    return val;
+}
 
 } // namespace muphfasa

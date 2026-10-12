@@ -13,22 +13,40 @@
 namespace muphfasa {
 
 void writePlotfile(const std::string&                          file_name,
-                   const amrex::Vector<const amrex::MultiFab*>& /*mfs*/,
-                   const amrex::Vector<std::string>&           /*var_names*/,
-                   const amrex::Geometry&                      /*geom*/,
+                   const amrex::Vector<const amrex::MultiFab*>& mfs,
+                   const amrex::Vector<std::string>&           var_names,
+                   const amrex::Geometry&                      geom,
                    amrex::Real                                 time,
                    int                                         step)
 {
-    // TODO: merge mfs into a single MultiFab (or use WriteSingleLevelPlotfile
-    //       directly if they already share BoxArray/DM), then call
-    //       amrex::WriteSingleLevelPlotfile(file_name, merged, var_names, geom, time, step).
-    amrex::Print() << "Plotfile: would write " << file_name
+    if (mfs.empty()) {
+        amrex::Print() << "Plotfile: nothing to write for " << file_name << "\n";
+        return;
+    }
+
+    int ncomp_total = 0;
+    for (const auto* mf : mfs) { ncomp_total += mf->nComp(); }
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        ncomp_total == static_cast<int>(var_names.size()),
+        "writePlotfile: var_names size does not match total component count");
+
+    amrex::MultiFab plot_mf(mfs[0]->boxArray(), mfs[0]->DistributionMap(), ncomp_total, 0);
+
+    int dcomp = 0;
+    for (const auto* mf : mfs) {
+        amrex::MultiFab::Copy(plot_mf, *mf, 0, dcomp, mf->nComp(), 0);
+        dcomp += mf->nComp();
+    }
+
+    amrex::WriteSingleLevelPlotfile(file_name, plot_mf, var_names, geom, time, step);
+
+    amrex::Print() << "Plotfile: wrote " << file_name
                    << "  step=" << step << "  time=" << time << "\n";
 }
 
 void writeMacroPlotfile(const std::string&     file_name,
-                        const amrex::MultiFab& /*rho_mf*/,
-                        const amrex::MultiFab& /*vel_mf*/,
+                        const amrex::MultiFab& rho_mf,
+                        const amrex::MultiFab& vel_mf,
                         const amrex::Geometry& geom,
                         amrex::Real            time,
                         int                    step)
@@ -39,8 +57,9 @@ void writeMacroPlotfile(const std::string&     file_name,
 #elif (AMREX_SPACEDIM == 3)
     names.push_back("vx"); names.push_back("vy"); names.push_back("vz");
 #endif
-    // TODO: build combined MultiFab and forward to writePlotfile
-    writePlotfile(file_name, {}, names, geom, time, step);
+
+    const amrex::Vector<const amrex::MultiFab*> mfs = {&rho_mf, &vel_mf};
+    writePlotfile(file_name, mfs, names, geom, time, step);
 }
 
 std::string plotfileName(const std::string& prefix, int step)
