@@ -10,28 +10,26 @@
 namespace muphfasa {
 
 
-// ── BGK ParallelFor Launch kernel ─────────────────────────────────────────────────
+// ── BGK::collide (single-cell kernel) ─────────────────────────────────────
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real BGK::collide(const amrex::Real f,
+                         const amrex::Real feq,
+                         const amrex::Real omega) noexcept
+{
+    return (1 - omega) * f + omega * feq;
+}
+
+// ── BGK::collideArr (array-level kernel) ──────────────────────────────────
 template <typename LatticeTag>
-static void BGK::collideArr(const amrex::Box& box,
-                       amrex::Array4<amrex::Real> const& f_arr,
-                       amrex::Array4<const amrex::Real> const& feq_arr,
-                       const amrex::Real omega)
+void BGK::collideArr(const amrex::Box& box,
+                     amrex::Array4<amrex::Real> const& f_arr,
+                     amrex::Array4<const amrex::Real> const& feq_arr,
+                     const amrex::Real omega)
 {
     amrex::ParallelFor(box, LatticeTag::Q,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
-
-        // collide
-        f_arr(i, j, k, n) = collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega);
+        f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega);
     });
-}
-
-// single cell compute kernel
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-static amrex::Real BGK::collide(const amrex::Real f,
-                    const amrex::Real feq,  
-                    const amrex::Real omega) noexcept
-{
-    return (1 - omega) * f + omega * feq;
 }
 
 // ── MultiFab-level dispatch ───────────────────────────────────────────────
