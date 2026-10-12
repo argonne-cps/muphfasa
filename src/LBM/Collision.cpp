@@ -118,14 +118,24 @@ template void collideMF<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amr
 template void collideMF<D3Q19,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideMF<D3Q27,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 
-template void collideFullArr<D2Q9, BGK> (const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
+// collideFullArr branches on AMREX_SPACEDIM (not on LatticeTag::D) via
+// computeVelocityCell2D/3D, so only the lattice(s) matching the build's
+// dimensionality may be instantiated. collideFullMF inherits the same
+// restriction since it calls collideFullArr internally.
+#if (AMREX_SPACEDIM == 2)
+template void collideFullArr<D2Q9, BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
+#else
 template void collideFullArr<D3Q15,BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
 template void collideFullArr<D3Q19,BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
 template void collideFullArr<D3Q27,BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
+#endif
 
-template void collideFullMF<D2Q9, BGK> (amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
+#if (AMREX_SPACEDIM == 2)
+template void collideFullMF<D2Q9, BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
+#else
 template void collideFullMF<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideFullMF<D3Q19,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideFullMF<D3Q27,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
+#endif
 
 } // namespace muphfasa
