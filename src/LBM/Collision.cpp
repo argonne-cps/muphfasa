@@ -7,7 +7,7 @@
 #include "LatticeDescriptor.H"
 #include "Macroscopic.H"
 
-#include <AMReX_ParallelFor.H>
+#include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
 

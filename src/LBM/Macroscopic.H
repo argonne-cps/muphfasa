@@ -7,7 +7,7 @@
 #ifndef MUPHFASA_MACROSCOPIC_H
 #define MUPHFASA_MACROSCOPIC_H
 
-#include <AMReX_GpuArray.H>
+#include <AMReX_Array.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>

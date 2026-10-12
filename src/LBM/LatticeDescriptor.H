@@ -7,7 +7,7 @@
 #ifndef MUPHFASA_LATTICE_DESCRIPTOR_H
 #define MUPHFASA_LATTICE_DESCRIPTOR_H
 
-#include <AMReX_GpuArray.H>
+#include <AMReX_Array.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_REAL.H>
 

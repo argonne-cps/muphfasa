@@ -1,0 +1,58 @@
+// InputParser.H — Wrapper around AMReX ParmParse for muphfasa input files.
+// Reads all solver parameters from the input file and exposes typed accessors.
+// Unrecognised keys are silently ignored by ParmParse; this class enforces
+// required keys and provides defaults for optional ones.
+
+#ifndef MUPHFASA_INPUT_PARSER_H
+#define MUPHFASA_INPUT_PARSER_H
+
+#include <AMReX_Array.H>
+#include <AMReX_REAL.H>
+
+#include <array>
+#include <string>
+
+namespace muphfasa {
+
+class InputParser
+{
+public:
+    // Reads from the file already loaded by AMReX (specified on the command
+    // line as the first positional argument, or via amrex.input_file).
+    InputParser();
+
+    // ── Grid ─────────────────────────────────────────────────────────────
+    std::array<int, AMREX_SPACEDIM> ncells()       const;  // cells per direction
+    int                              maxGridSize()  const;
+    int                              nGhost()       const;  // ghost-cell layers
+
+    // ── Time stepping ─────────────────────────────────────────────────────
+    int         maxStep()      const;
+    amrex::Real stopTime()     const;  // physical end time (optional)
+
+    // ── LBM parameters ───────────────────────────────────────────────────
+    std::string latticeType()  const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
+    amrex::Real tau()          const;  // BGK relaxation time [lattice units]
+
+    // ── Physical / unit parameters ────────────────────────────────────────
+    amrex::Real reynoldsNumber() const;
+    amrex::Real machNumber()     const;
+    amrex::Real refLength()      const;   // [m]
+    amrex::Real refVelocity()    const;   // [m/s]
+    amrex::Real refViscosity()   const;   // [m^2/s]
+    amrex::Real refDensity()     const;   // [kg/m^3]
+
+    // ── Geometry ─────────────────────────────────────────────────────────
+    std::string geometryType()   const;   // "box" | "sphere" | "stl" | …
+    bool        useEB()          const;
+
+    // ── Output ───────────────────────────────────────────────────────────
+    int         plotInterval()       const;
+    int         checkpointInterval() const;
+    std::string plotfilePrefix()     const;
+    std::string checkpointPrefix()   const;
+};
+
+} // namespace muphfasa
+
+#endif // MUPHFASA_INPUT_PARSER_H

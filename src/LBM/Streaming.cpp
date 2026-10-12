@@ -6,7 +6,7 @@
 #include "Streaming.H"
 #include "LatticeDescriptor.H"
 
-#include <AMReX_ParallelFor.H>
+#include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
 
