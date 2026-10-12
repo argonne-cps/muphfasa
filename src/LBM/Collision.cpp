@@ -5,6 +5,7 @@
 #include "Collision.H"
 #include "LatticeDescriptor.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_ParallelFor.H>
 
 namespace muphfasa {
@@ -26,6 +27,8 @@ void BGK::collideArr(const amrex::Box& box,
                      amrex::Array4<const amrex::Real> const& feq_arr,
                      const amrex::Real omega)
 {
+    BL_PROFILE("BGK::collideArr()");
+
     amrex::ParallelFor(box, LatticeTag::Q,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
         f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega);
@@ -38,6 +41,8 @@ void collideMF(amrex::MultiFab&       f_mf,
              const amrex::MultiFab& feq_mf,
              amrex::Real            omega)
 {
+    BL_PROFILE("collideMF()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -61,6 +66,8 @@ void collideFullArr(const amrex::Box box,
                     amrex::Array4<amrex::Real> const& vel_arr,
                     amrex::Real omega)
 {
+        BL_PROFILE("collideFullArr()");
+
         // launch kernel
         amrex::ParallelFor(box,[=] AMREX_GPU_DEVICE(int i, int j, int k){
 
@@ -95,6 +102,8 @@ void collideFullMF(amrex::MultiFab& fstar_mf,
              amrex::MultiFab& vel_mf,
              amrex::Real omega)
 {
+    BL_PROFILE("collideFullMF()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
