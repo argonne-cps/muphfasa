@@ -12,7 +12,17 @@
 
 namespace muphfasa {
 
-// ── compute kernel ─────────────────────────────────────────────────────
+// ── single-cell kernel ─────────────────────────────────────────────────
+// Returns f^eq for a single (cell, direction n) pair given rho and u at
+// that cell. Callable directly from GPU device code without an AMReX
+// ParallelFor context (e.g. from unit tests on host).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeEquilibriumCell(const amrex::Real rho,
+                                   amrex::Array4<amrex::Real const> const& vel,
+                                   int i, int j, int k, int n) noexcept;
+
+// ── array-level kernel ─────────────────────────────────────────────────
 // Returns f^eq for a all velocity directions given rho and u array
 // LatticeTag must be one of the LatticeDescriptor specialisations.
 template <typename LatticeTag>
