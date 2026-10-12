@@ -1,0 +1,37 @@
+# Regression test: Plane Poiseuille flow (2-D channel, pressure-driven).
+# Analytic solution: parabolic velocity profile u(y) = (dp/dx)/(2*mu) * y*(H-y).
+# Expected convergence: second-order in dx.
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells      = 4 32     # Nx Ny  (periodic in x, walls at y=0 and y=H)
+grid.max_grid_size = 32
+grid.n_ghost     = 1
+
+# ── Simulation ─────────────────────────────────────────────────────────────
+sim.max_step     = 10000
+sim.stop_time    = -1.0      # run to max_step
+
+# ── LBM ────────────────────────────────────────────────────────────────────
+lbm.lattice_type = D2Q9
+lbm.tau          = 0.8       # relaxation time (nu = cs2*(tau-0.5))
+
+# ── Physical units ─────────────────────────────────────────────────────────
+units.Re         = 10.0
+units.Ma         = 0.05
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+# x: periodic  (set automatically when ncells[0] > 1 and geom is periodic)
+# y: no-slip walls (bounce-back)
+bc.lo_type = periodic  noslip
+bc.hi_type = periodic  noslip
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 0.125  1.0
+geometry.is_periodic = 1   0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 1000
+amr.chk_int         = 5000
+amr.plot_file       = plt
+amr.check_file      = chk
