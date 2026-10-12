@@ -1,12 +1,9 @@
 // Macroscopic.H — Interfaces for computing macroscopic fluid variables.
 // Derives density (rho) and velocity (u) from the distribution function f
 // by taking zeroth and first moments over the discrete velocity set.
-// Per-cell kernels that are called across translation units (computeDensityCell,
-// computeVelocityCell2D/3D) are defined inline right here: they're marked
-// AMREX_FORCE_INLINE (always_inline), and always_inline across a TU boundary
-// requires the body to be visible at the call site, not just declared.
-// computeVelocityCell stays in Macroscopic.cpp since it's only ever called
-// from within that same file.
+// computeDensityCell/computeVelocityCell2D/3D are defined inline here since
+// they're always_inline and called across translation units; computeVelocityCell
+// stays in Macroscopic.cpp since it's only called from within that file.
 
 #ifndef MUPHFASA_MACROSCOPIC_H
 #define MUPHFASA_MACROSCOPIC_H
@@ -44,9 +41,8 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
                          amrex::Array4<amrex::Real> const& vel_arr,
                          int i, int j, int k) noexcept;
 
-// GpuArray-returning variants: identical math to computeVelocityCell, but
-// return the velocity as local scratch instead of writing into an Array4.
-// For use by fused kernels that have no MultiFab to write u into.
+// GpuArray-returning variants: same math, returned as local scratch instead
+// of written into an Array4. Used by fused kernels with no MultiFab for u.
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,

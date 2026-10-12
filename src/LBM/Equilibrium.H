@@ -14,21 +14,17 @@
 namespace muphfasa {
 
 // ── single-cell kernel ─────────────────────────────────────────────────
-// Returns f^eq for a single (cell, direction n) pair given rho and u at
-// that cell. Callable directly from GPU device code without an AMReX
-// ParallelFor context (e.g. from unit tests on host).
+// Returns f^eq for a single (cell, direction n) pair given rho and u.
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeEquilibriumCell(const amrex::Real rho,
                                    amrex::Array4<amrex::Real const> const& vel,
                                    int i, int j, int k, int n) noexcept;
 
-// GpuArray-based variants: identical math to computeEquilibriumCell, but take
-// u as local scratch (from e.g. computeVelocityCell2D/3D) instead of reading
-// it out of an Array4. For use by fused kernels that have no vel MultiFab.
-// Defined inline right here (not in Equilibrium.cpp): they're marked
-// AMREX_FORCE_INLINE (always_inline), which across a TU boundary (e.g. called
-// from Collision.cpp) requires the body to be visible at the call site.
+// GpuArray-based variants: same math, u passed as local scratch instead of
+// an Array4 lookup. Used by fused kernels with no vel MultiFab. Defined
+// inline here, not in Equilibrium.cpp, since always_inline needs the body
+// visible at every call site (e.g. from Collision.cpp).
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeEquilibriumCell2D(const amrex::Real rho,
@@ -61,8 +57,7 @@ amrex::Real computeEquilibriumCell3D(const amrex::Real rho,
 }
 
 // ── array-level kernel ─────────────────────────────────────────────────
-// Returns f^eq for a all velocity directions given rho and u array
-// LatticeTag must be one of the LatticeDescriptor specialisations.
+// Fills feq_arr for all velocity directions given rho and u arrays.
 template <typename LatticeTag>
 void computeEquilibrium(const amrex::Box& box,
                                amrex::Array4<amrex::Real const> const& rho,

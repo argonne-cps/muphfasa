@@ -69,9 +69,7 @@ void streamInPlace(amrex::MultiFab&       f,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
-// streamCell (and everything that calls it) branches on AMREX_SPACEDIM (not
-// on LatticeTag::D), so only the lattice(s) matching the build's
-// dimensionality may be instantiated.
+// Dimension-matched only: streamCell branches on AMREX_SPACEDIM.
 #if (AMREX_SPACEDIM == 2)
 template amrex::Real streamCell<D2Q9>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
 #else

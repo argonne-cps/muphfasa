@@ -1,9 +1,7 @@
 // Macroscopic.cpp — Implementations of density and velocity moment calculations.
-// computeDensityCell/computeVelocityCell2D/3D are defined in Macroscopic.H
-// (always_inline templates called cross-TU need their body visible at every
-// call site). computeVelocityCell stays here since it's only ever called
-// from within this file. MultiFab-level helpers drive AMReX parallel loops
-// over the MFIter / ParallelFor infrastructure.
+// computeDensityCell/computeVelocityCell2D/3D live in Macroscopic.H (see
+// header comment); computeVelocityCell stays here since it's only called
+// from within this file.
 
 #include "Macroscopic.H"
 #include "LatticeDescriptor.H"
@@ -11,55 +9,6 @@
 #include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
-
-// ── computeDensityCell ────────────────────────────────────────────────────
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real computeDensityCell(amrex::Array4<const amrex::Real> const& f_arr,
-                               int i, int j, int k) noexcept
-{
-    amrex::Real rho = 0.;
-    for (int n = 0; n < LatticeTag::Q; ++n) {
-        rho += f_arr(i, j, k, n);
-    }
-    return rho;
-}
-
-// ── computeVelocityCell2D / computeVelocityCell3D ─────────────────────────
-// Canonical velocity math, returned as local scratch (no Array4 write
-// target required). computeVelocityCell below is a thin wrapper over these
-// for callers that need the result written into a MultiFab-backed array.
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,
-                                                       const amrex::Real rho,
-                                                       int i, int j, int k) noexcept
-{
-    amrex::Real ux = 0.;
-    amrex::Real uy = 0.;
-    for (int n = 0; n < LatticeTag::Q; ++n) {
-        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-    }
-    return {ux / rho, uy / rho};
-}
-
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
-                                                       const amrex::Real rho,
-                                                       int i, int j, int k) noexcept
-{
-    amrex::Real ux = 0.;
-    amrex::Real uy = 0.;
-    amrex::Real uz = 0.;
-    for (int n = 0; n < LatticeTag::Q; ++n) {
-        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
-        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
-        uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
-    }
-    return {ux / rho, uy / rho, uz / rho};
-}
 
 // ── computeVelocityCell ───────────────────────────────────────────────────
 // Writes the computeVelocityCell2D/3D result into vel_arr(i,j,k,*).
@@ -129,12 +78,7 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
-// computeDensityCell and computeVelocityCell2D/3D are defined in
-// Macroscopic.H now (see file header comment), so they don't need (and can't
-// usefully have) explicit instantiations here.
-
-// computeVelocityCell branches on AMREX_SPACEDIM (not on LatticeTag::D), so
-// only the lattice(s) matching the build's dimensionality may be instantiated.
+// Dimension-matched only: computeVelocityCell branches on AMREX_SPACEDIM.
 #if (AMREX_SPACEDIM == 2)
 template void computeVelocityCell<D2Q9>(amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::Array4<amrex::Real> const&, int, int, int);
 #else
@@ -148,8 +92,6 @@ template void computeDensity<D3Q15>(const amrex::Box&, amrex::Array4<const amrex
 template void computeDensity<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeDensity<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 
-// computeVelocity and computeMacroscopic call computeVelocityCell internally,
-// so they inherit the same AMREX_SPACEDIM-vs-LatticeTag::D restriction.
 #if (AMREX_SPACEDIM == 2)
 template void computeVelocity<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 #else

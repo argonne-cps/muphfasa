@@ -53,12 +53,7 @@ void collideMF(amrex::MultiFab&       f_mf,
 }
 
 // ── collideFullArr (per-tile kernel) ──────────────────────────────────────
-// rho, u, and f^eq are computed as per-cell scratch registers rather than
-// written to MultiFabs, since nothing downstream of this fused kernel needs
-// them. u and f^eq are computed via the shared computeVelocityCell2D/3D and
-// computeEquilibriumCell2D/3D kernels (GpuArray-based, no Array4 write
-// target needed) so the formulas stay in one place with Macroscopic.cpp and
-// Equilibrium.cpp.
+// Fuses rho/u/feq into per-cell scratch (no intermediate MultiFabs).
 template <typename LatticeTag, typename CollisionModel>
 void collideFullArr(const amrex::Box& box,
                     amrex::Array4<amrex::Real> const& fstar_arr,
@@ -120,10 +115,7 @@ template void collideMF<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amr
 template void collideMF<D3Q19,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideMF<D3Q27,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 
-// collideFullArr branches on AMREX_SPACEDIM (not on LatticeTag::D) via
-// computeVelocityCell2D/3D, so only the lattice(s) matching the build's
-// dimensionality may be instantiated. collideFullMF inherits the same
-// restriction since it calls collideFullArr internally.
+// Dimension-matched only: collideFullArr/MF branch on AMREX_SPACEDIM.
 #if (AMREX_SPACEDIM == 2)
 template void collideFullArr<D2Q9, BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
 #else
