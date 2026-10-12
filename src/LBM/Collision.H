@@ -14,33 +14,27 @@ namespace muphfasa {
 // ── Collision model tag types ─────────────────────────────────────────────
 struct BGK {
     template <typename LatticeTag>
-    static void collide(const amrex::Box& box,
-                amrex::Array4<amrex::Real> const& f_arr,
-                amrex::Array4<const amrex::Real> const& feq_arr,
-                const amrex::Real omega);
+    static void collideArr(const amrex::Box& box,
+                           amrex::Array4<amrex::Real> const& f_arr,
+                           amrex::Array4<const amrex::Real> const& feq_arr,
+                           const amrex::Real omega);
+
+    AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+    static amrex::Real collide(const amrex::Real f,
+                               const amrex::Real feq,
+                               const amrex::Real omega) noexcept;
 };   // single-relaxation-time
 struct TRT {};   // two-relaxation-time     (not yet implemented)
 struct MRT {};   // multiple-relaxation-time (not yet implemented)
-
-// ── BGK cell-local kernel ─────────────────────────────────────────────────
-
-// f_q(t+1) = f_q - (1/tau) * (f_q - f^eq_q)
-// tau: BGK relaxation time (tau = nu/cs2 + 0.5 in lattice units)
-// f and feq are arrays of length LatticeTag::Q.
-template <typename LatticeTag>
-void BGK::collide(const amrex::Box& box,
-                amrex::Array4<amrex::Real> const& f_arr,
-                amrex::Array4<const amrex::Real> const& feq_arr,
-                const amrex::Real omega) noexcept;
 
 // ── MultiFab-level collision (host-side) ─────────────────────────────────
 
 // Apply the collision operator in-place to f_mf given feq_mf and tau.
 // Dispatches on CollisionModel tag (currently only BGK is active).
 template <typename LatticeTag, typename CollisionModel>
-void collide(amrex::MultiFab&       f_mf,
-             const amrex::MultiFab& feq_mf,
-             amrex::Real            omega);
+void collideMF(amrex::MultiFab&       f_mf,
+               const amrex::MultiFab& feq_mf,
+               amrex::Real            omega);
 
 } // namespace muphfasa
 
