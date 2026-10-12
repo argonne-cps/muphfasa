@@ -36,19 +36,21 @@ void collideMF(amrex::MultiFab&       f_mf,
                const amrex::MultiFab& feq_mf,
                amrex::Real            omega);
 
+// Per-tile kernel: computes rho, u, and f^eq per cell and immediately
+// relaxes f toward it into fstar_arr. rho/u/feq are local per-cell scratch,
+// not written out to MultiFabs, since nothing downstream of this fused
+// kernel needs them.
 template <typename LatticeTag, typename CollisionModel>
-void collideFullArr(amrex::MultiFab& f_mf,
-             amrex::MultiFab& feq_mf,
-             amrex::MultiFab& rho_mf,
-             amrex::MultiFab& vel_mf,
-             amrex::Real omega);
+void collideFullArr(const amrex::Box& box,
+                    amrex::Array4<amrex::Real> const& fstar_arr,
+                    amrex::Array4<const amrex::Real> const& f_arr,
+                    amrex::Real omega);
 
+// Full collision step: fused rho/u/feq/fstar computation in one MFIter pass.
 template <typename LatticeTag, typename CollisionModel>
-void collideFullMF(amrex::MultiFab& f_mf,
-             amrex::MultiFab& feq_mf,
-             amrex::MultiFab& rho_mf,
-             amrex::MultiFab& vel_mf,
-             amrex::Real omega);
+void collideFullMF(amrex::MultiFab&       fstar_mf,
+                   const amrex::MultiFab& f_mf,
+                   amrex::Real            omega);
 
 } // namespace muphfasa
 
