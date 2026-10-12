@@ -70,20 +70,22 @@ void collideFullArr(const amrex::Box& box,
         // calc rho
         const amrex::Real rho = computeDensityCell<LatticeTag>(f_arr, i, j, k);
 
-        // calc u and fstar for each comp in a single merged loop
+        // calc u 
 #if (AMREX_SPACEDIM == 2)
         const auto u = computeVelocityCell2D<LatticeTag>(f_arr, rho, i, j, k);
-        for (int n = 0; n < LatticeTag::Q; ++n) {
-            const amrex::Real feq = computeEquilibriumCell2D<LatticeTag>(rho, u, n);
-            fstar_arr(i, j, k, n) = CollisionModel::collide(f_arr(i, j, k, n), feq, omega);
-        }
 #else
         const auto u = computeVelocityCell3D<LatticeTag>(f_arr, rho, i, j, k);
+#endif
+
+        // calc fstar for each comp
         for (int n = 0; n < LatticeTag::Q; ++n) {
+#if (AMREX_SPACEDIM == 2)
+            const amrex::Real feq = computeEquilibriumCell2D<LatticeTag>(rho, u, n);
+#else
             const amrex::Real feq = computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+#endif
             fstar_arr(i, j, k, n) = CollisionModel::collide(f_arr(i, j, k, n), feq, omega);
         }
-#endif
     });
 }
 
