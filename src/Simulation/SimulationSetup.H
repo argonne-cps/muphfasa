@@ -23,13 +23,14 @@ class GeometryHandler;
 class UnitConverter;
 class BCManager;
 
-// LatticeTag fixes the velocity set (D2Q9, D3Q15, D3Q19, or D3Q27) at
-// compile time, which is what lets the LBM kernels use compile-time-known
+// LatticeTag fixes the velocity set (D2Q9, D3Q15, D3Q19, or D3Q27), and
+// CollisionModel fixes the collision operator (BGK, TRT, MRT), both at
+// compile time -- this is what lets the LBM kernels use compile-time-known
 // component counts and constexpr lattice data on the GPU. The *runtime*
-// choice of lattice (read from the input file) happens once, in
-// makeSimulation() (SimulationFactory.H), which picks which
-// SimulationImpl<LatticeTag> to instantiate.
-template <typename LatticeTag>
+// choice of lattice and collision model (read from the input file) happens
+// once, in makeSimulation() (SimulationFactory.H), which picks which
+// SimulationImpl<LatticeTag, CollisionModel> to instantiate.
+template <typename LatticeTag, typename CollisionModel>
 class SimulationImpl : public ISimulation
 {
 public:

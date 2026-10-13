@@ -24,8 +24,8 @@
 
 namespace muphfasa {
 
-template <typename LatticeTag>
-SimulationImpl<LatticeTag>::SimulationImpl(const InputParser& params)
+template <typename LatticeTag, typename CollisionModel>
+SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& params)
     : m_params(params)
 {
     // TODO: construct UnitConverter from params, then GeometryHandler,
@@ -33,23 +33,23 @@ SimulationImpl<LatticeTag>::SimulationImpl(const InputParser& params)
     //       then buildBCManager.
 }
 
-template <typename LatticeTag>
-SimulationImpl<LatticeTag>::~SimulationImpl() = default;
+template <typename LatticeTag, typename CollisionModel>
+SimulationImpl<LatticeTag, CollisionModel>::~SimulationImpl() = default;
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::initialize()
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 {
     // TODO: setInitialConditions(), fillGhostCells()
     //       Optionally restart from a checkpoint if one exists.
     amrex::Print() << "Simulation::initialize() -- stub\n";
 }
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::advance(int step)
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 {
     // TODO:
-    //   1. computeEquilibriumMF<LatticeTag> (rho, vel -> feq)
-    //   2. collideMF<LatticeTag, BGK>       (f, feq, tau)
+    //   1. computeEquilibriumMF<LatticeTag>            (rho, vel -> feq)
+    //   2. collideMF<LatticeTag, CollisionModel>        (f, feq, tau)
     //   3. fillGhostCells                   (MPI halo exchange)
     //   4. streamInPlace<LatticeTag>        (f)
     //   5. m_bc_manager->applyAll(f, geom, step)
@@ -58,8 +58,8 @@ void SimulationImpl<LatticeTag>::advance(int step)
     amrex::ignore_unused(step);
 }
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::writeOutput(int step) const
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 {
     if (step % m_params.plotInterval() == 0) {
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
@@ -72,21 +72,21 @@ void SimulationImpl<LatticeTag>::writeOutput(int step) const
     }
 }
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::setInitialConditions()
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
     // TODO: fill m_f with the equilibrium for the prescribed initial rho and u
 }
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::fillGhostCells()
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
 {
     // TODO: m_f.FillBoundary(m_geom.periodicity())
     //       and FillPatch for non-periodic / EB boundaries
 }
 
-template <typename LatticeTag>
-void SimulationImpl<LatticeTag>::buildBCManager()
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
     // TODO: read BC types from m_params and register them with m_bc_manager
 }
@@ -94,12 +94,17 @@ void SimulationImpl<LatticeTag>::buildBCManager()
 // ── Explicit instantiations ─────────────────────────────────────────────────
 // Dimension-matched only: a 2D build only ever has D2Q9; a 3D build offers a
 // runtime choice among D3Q15/D3Q19/D3Q27 (see SimulationFactory.cpp).
+//
+// Only BGK is instantiated for now, since TRT/MRT (Collision.H) don't yet
+// implement collide()/collideArr(). Adding a new collision model means
+// implementing it in Collision.cpp, then adding its instantiation lines here
+// and wiring it into SimulationFactory.cpp's collision-model dispatch.
 #if (AMREX_SPACEDIM == 2)
-template class SimulationImpl<D2Q9>;
+template class SimulationImpl<D2Q9, BGK>;
 #else
-template class SimulationImpl<D3Q15>;
-template class SimulationImpl<D3Q19>;
-template class SimulationImpl<D3Q27>;
+template class SimulationImpl<D3Q15, BGK>;
+template class SimulationImpl<D3Q19, BGK>;
+template class SimulationImpl<D3Q27, BGK>;
 #endif
 
 } // namespace muphfasa

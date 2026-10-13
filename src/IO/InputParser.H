@@ -31,8 +31,9 @@ public:
     amrex::Real stopTime()     const;  // physical end time (optional)
 
     // ── LBM parameters ───────────────────────────────────────────────────
-    std::string latticeType()  const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
-    amrex::Real tau()          const;  // BGK relaxation time [lattice units]
+    std::string latticeType()    const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
+    std::string collisionModel() const;  // "BGK" | "TRT" | "MRT"
+    amrex::Real tau()             const;  // relaxation time [lattice units]
 
     // ── Physical / unit parameters ────────────────────────────────────────
     amrex::Real reynoldsNumber() const;

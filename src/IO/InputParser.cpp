@@ -62,6 +62,14 @@ std::string InputParser::latticeType() const
     return val;
 }
 
+std::string InputParser::collisionModel() const
+{
+    amrex::ParmParse pp("lbm");
+    std::string val = "BGK";
+    pp.query("collision_model", val);
+    return val;
+}
+
 amrex::Real InputParser::tau() const
 {
     amrex::ParmParse pp("lbm");
