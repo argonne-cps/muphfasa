@@ -6,6 +6,8 @@
 #ifndef MUPHFASA_SIMULATION_SETUP_H
 #define MUPHFASA_SIMULATION_SETUP_H
 
+#include "ISimulation.H"
+
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
@@ -21,29 +23,36 @@ class GeometryHandler;
 class UnitConverter;
 class BCManager;
 
-class Simulation
+// LatticeTag fixes the velocity set (D2Q9, D3Q15, D3Q19, or D3Q27) at
+// compile time, which is what lets the LBM kernels use compile-time-known
+// component counts and constexpr lattice data on the GPU. The *runtime*
+// choice of lattice (read from the input file) happens once, in
+// makeSimulation() (SimulationFactory.H), which picks which
+// SimulationImpl<LatticeTag> to instantiate.
+template <typename LatticeTag>
+class SimulationImpl : public ISimulation
 {
 public:
-    explicit Simulation(const InputParser& params);
-    ~Simulation();
+    explicit SimulationImpl(const InputParser& params);
+    ~SimulationImpl() override;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     // Allocate MultiFabs, set initial conditions, and fill ghost cells.
-    void initialize();
+    void initialize() override;
 
     // Advance by one time step: collision -> streaming -> boundary conditions
     // -> macroscopic update.
-    void advance(int step);
+    void advance(int step) override;
 
     // Write plotfile and/or checkpoint when the output intervals are hit.
-    void writeOutput(int step) const;
+    void writeOutput(int step) const override;
 
     // ── State accessors ───────────────────────────────────────────────────
-    const amrex::MultiFab& f()   const noexcept { return m_f;   }
-    const amrex::MultiFab& rho() const noexcept { return m_rho; }
-    const amrex::MultiFab& vel() const noexcept { return m_vel; }
+    const amrex::MultiFab& f()   const noexcept override { return m_f;   }
+    const amrex::MultiFab& rho() const noexcept override { return m_rho; }
+    const amrex::MultiFab& vel() const noexcept override { return m_vel; }
 
-    amrex::Real time()           const noexcept { return m_time; }
+    amrex::Real time() const noexcept override { return m_time; }
 
 private:
     // ── Input and unit conversion ─────────────────────────────────────────
@@ -57,8 +66,8 @@ private:
     amrex::DistributionMapping       m_dm;
 
     // ── Distribution function and macroscopic fields ──────────────────────
-    amrex::MultiFab m_f;    // distribution: Q components
-    amrex::MultiFab m_feq;  // equilibrium:  Q components (scratch)
+    amrex::MultiFab m_f;    // distribution: LatticeTag::Q components
+    amrex::MultiFab m_feq;  // equilibrium:  LatticeTag::Q components (scratch)
     amrex::MultiFab m_rho;  // density:      1 component
     amrex::MultiFab m_vel;  // velocity:     AMREX_SPACEDIM components
 

@@ -5,21 +5,24 @@
 #include <AMReX.H>
 
 #include "IO/InputParser.H"
-#include "Simulation/SimulationSetup.H"
+#include "Simulation/ISimulation.H"
+#include "Simulation/SimulationFactory.H"
+
+#include <memory>
 
 int main(int argc, char* argv[])
 {
     amrex::Initialize(argc, argv);
     {
         muphfasa::InputParser params;
-        muphfasa::Simulation  sim(params);
+        std::unique_ptr<muphfasa::ISimulation> sim = muphfasa::makeSimulation(params);
 
-        sim.initialize();
+        sim->initialize();
 
         const int max_step = params.maxStep();
         for (int step = 0; step <= max_step; ++step) {
-            sim.advance(step);
-            sim.writeOutput(step);
+            sim->advance(step);
+            sim->writeOutput(step);
         }
     }
     amrex::Finalize();

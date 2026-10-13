@@ -57,6 +57,7 @@ CEXE_sources += InputParser.cpp
 CEXE_sources += Checkpoint.cpp
 CEXE_sources += Plotfile.cpp
 CEXE_sources += SimulationSetup.cpp
+CEXE_sources += SimulationFactory.cpp
 
 include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 

@@ -58,7 +58,7 @@ std::string InputParser::latticeType() const
 {
     amrex::ParmParse pp("lbm");
     std::string val = "D3Q19";
-    // TODO: pp.query("lattice_type", val);
+    pp.query("lattice_type", val);
     return val;
 }
 

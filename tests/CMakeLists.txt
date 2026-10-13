@@ -22,6 +22,7 @@ set(SOLVER_SOURCES_NO_MAIN
     ${CMAKE_SOURCE_DIR}/src/IO/Checkpoint.cpp
     ${CMAKE_SOURCE_DIR}/src/IO/Plotfile.cpp
     ${CMAKE_SOURCE_DIR}/src/Simulation/SimulationSetup.cpp
+    ${CMAKE_SOURCE_DIR}/src/Simulation/SimulationFactory.cpp
 )
 
 set(UNIT_TEST_NAMES
