@@ -5,7 +5,10 @@
 
 #include "InputParser.H"
 
+#include <AMReX_BLassert.H>
 #include <AMReX_ParmParse.H>
+
+#include <vector>
 
 namespace muphfasa {
 
@@ -101,6 +104,32 @@ amrex::Real InputParser::refDensity()   const { return amrex::Real(1.0); }
 
 std::string InputParser::geometryType() const { return "box"; }
 bool        InputParser::useEB()        const { return false; }
+
+std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
+{
+    // bc.lo = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
+    // bc.hi = NoSlip Outflow Periodic
+    amrex::ParmParse pp("bc");
+
+    std::vector<std::string> lo, hi;
+    pp.getarr("lo", lo);
+    pp.getarr("hi", hi);
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        static_cast<int>(lo.size()) == AMREX_SPACEDIM &&
+        static_cast<int>(hi.size()) == AMREX_SPACEDIM,
+        "InputParser::bcNames: bc.lo and bc.hi must each list exactly "
+        "AMREX_SPACEDIM names (one per direction)");
+
+    // Order matches muphfasa::faceIndex(dir, bound): [xlo, xhi, ylo, yhi,
+    // zlo, zhi].
+    std::array<std::string, 2 * AMREX_SPACEDIM> names{};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        names[2 * dir]     = lo[dir];
+        names[2 * dir + 1] = hi[dir];
+    }
+    return names;
+}
 
 int InputParser::plotInterval()       const { return 100; }
 int InputParser::checkpointInterval() const { return 1000; }
