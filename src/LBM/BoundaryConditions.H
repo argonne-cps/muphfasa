@@ -23,8 +23,15 @@
 #include <AMReX_REAL.H>
 
 #include <array>
+#include <string>
 
 namespace muphfasa {
+
+// Shared face-index convention: [xlo, xhi, ylo, yhi, zlo, zhi]. Used by
+// both BCManager::setFaceBC/operator() and the registry/SimulationSetup
+inline constexpr int faceIndex(int dir, int bound) noexcept {
+    return 2 * dir + (bound < 0 ? 0 : 1);
+}
 
 // Our own dispatch tag — never amrex::BCType. Adding a BC means adding an
 // enumerator here, nowhere else in amrex's namespace.
@@ -116,12 +123,18 @@ public:
     }
 
 private:
-    static constexpr int faceIndex(int dir, int bound) noexcept {
-        return 2 * dir + (bound < 0 ? 0 : 1);
-    }
-
     amrex::GpuArray<lbmBCtype, 2 * AMREX_SPACEDIM> m_face_bc{};
 };
+
+// Face name -> our own dispatch enum. 
+lbmBCtype parselbmBCtype(const std::string& name);
+
+// Face names -> the amrex::BCRec actually handed to PhysBCFunct. Every
+// entry in the returned vector is identical and only ever carries 
+//int_dir ("Periodic") or kCustomBCSentinel (everything else) 
+// `ncomp` should be LatticeTag::Q;
+amrex::Vector<amrex::BCRec> makeBCRecVector(
+    const std::array<std::string, 2 * AMREX_SPACEDIM>& names, int ncomp);
 
 } // namespace muphfasa
 
