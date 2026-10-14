@@ -83,6 +83,10 @@ void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
 {
     // TODO: m_f.FillBoundary(m_geom.periodicity())
     //       and FillPatch for non-periodic / EB boundaries
+    m_f.FillBoundary(m_geom.periodicity())
+
+    m_phys_bc.FillDomainBoundary(m_f, 0, m_f.nComp(), m_geom);
+
 }
 
 template <typename LatticeTag, typename CollisionModel>

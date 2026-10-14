@@ -11,6 +11,7 @@ namespace muphfasa {
 void BCManager::addBC(std::unique_ptr<BoundaryConditionBase> bc)
 {
     m_bcs.push_back(std::move(bc));
+    bc.push_back(std::move(bc::bcrec_id));
 }
 
 void BCManager::applyAll(amrex::MultiFab&       f_mf,
@@ -24,11 +25,23 @@ void BCManager::applyAll(amrex::MultiFab&       f_mf,
 
 // ── NoSlipBC ──────────────────────────────────────────────────────────────
 template <typename LatticeTag>
-void NoSlipBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                  const amrex::Geometry& /*geom*/,
-                                  int /*step*/) const
+void NoSlipBC<LatticeTag>::apply(amrex::MultiFab& f_mf,
+                                  const amrex::Geometry& geom,
+                                  int step) const
 {
     // TODO: bounce-back:  f_out[opposite[q]] = f_in[q]  at solid boundaries
+    Vector<BCRec> bc;
+
+    // ...
+
+    // fills interior and periodic domain boundary ghost cells
+
+    // fills physical domain boundary ghost cells for a cell-centered multifab
+    if (not geom.isAllPeriodic()) {
+        GpuBndryFuncFab<MyExtBCFill> bf(MyExtBCFill{});
+        PhysBCFunct<GpuBndryFuncFab<MyExtBCFill> > physbcf(geom, bc, bf);
+        physbcf(mf, 0, mf.nComp(), mf.nGrowVector(), time, 0);
+    }
 }
 
 // ── InflowBC ──────────────────────────────────────────────────────────────
@@ -57,11 +70,12 @@ void OutflowBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
 
 // ── PeriodicBC ────────────────────────────────────────────────────────────
 template <typename LatticeTag>
-void PeriodicBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                    const amrex::Geometry& /*geom*/,
-                                    int /*step*/) const
+void PeriodicBC<LatticeTag>::apply(amrex::MultiFab& f_mf,
+                                    const amrex::Geometry& geom,
+                                    int step) const
 {
     // AMReX handles periodicity in FillBoundary; nothing to do here.
+    f_mf.FillBoundary(geom.periodicity());
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
