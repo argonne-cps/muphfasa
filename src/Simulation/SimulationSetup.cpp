@@ -30,7 +30,7 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
 {
     // TODO: construct UnitConverter from params, then GeometryHandler,
     //       then allocate MultiFabs (m_f/m_feq with LatticeTag::Q components),
-    //       then buildBCManager.
+    //       then buildBCManager() (needs m_geom to already be set).
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -52,10 +52,17 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     //   2. collideMF<LatticeTag, CollisionModel>        (f, feq, tau)
     //   3. fillGhostCells                   (MPI halo exchange)
     //   4. streamInPlace<LatticeTag>        (f)
-    //   5. m_bc_manager->applyAll(f, geom, step)
-    //   6. computeMacroscopic<LatticeTag>   (f -> rho, vel)
-    //   7. m_time += 1.0                    (lattice time unit)
+    //   5. computeMacroscopic<LatticeTag>   (f -> rho, vel)
+    //   6. m_time += 1.0                    (lattice time unit)
     amrex::ignore_unused(step);
+
+    // compute collision
+
+    // fill ghost cells
+
+    // do streaming
+
+    // optional plotting
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -81,18 +88,37 @@ void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
 {
-    // TODO: m_f.FillBoundary(m_geom.periodicity())
-    //       and FillPatch for non-periodic / EB boundaries
-    m_f.FillBoundary(m_geom.periodicity())
+    // fill internal bounds/periodic
+    m_f.FillBoundary(m_geom.periodicity());
 
-    m_phys_bc.FillDomainBoundary(m_f, 0, m_f.nComp(), m_geom);
-
+    // fill physical bounds via BCManager<LatticeTag> (see buildBCManager())
+    (*m_phys_bc)(m_f, 0, m_f.nComp(), m_f.nGrowVect(), m_time, 0);
 }
 
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
-    // TODO: read BC types from m_params and register them with m_bc_manager
+    const auto names = m_params.bcNames();
+
+    BCManager<LatticeTag> bc_manager{};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        for (int bound : {-1, 1}) {
+            const std::string& name = names[faceIndex(dir, bound)];
+            if (name == "Periodic") {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    m_geom.isPeriodic(dir),
+                    "buildBCManager: bc input requests \"Periodic\" on a "
+                    "face whose Geometry is not periodic in that direction");
+                continue; // no lbmBCtype to set; FillBoundary handles it
+            }
+            bc_manager.setFaceBC(dir, bound, parselbmBCtype(name));
+        }
+    }
+
+    amrex::Vector<amrex::BCRec> bcs = makeBCRecVector(names, LatticeTag::Q);
+
+    amrex::GpuBndryFuncFab<BCManager<LatticeTag>> gpu_bndry_func(bc_manager);
+    m_phys_bc = std::make_unique<PhysBCFunctType>(m_geom, bcs, gpu_bndry_func);
 }
 
 // ── Explicit instantiations ─────────────────────────────────────────────────

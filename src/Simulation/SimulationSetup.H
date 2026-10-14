@@ -7,11 +7,13 @@
 #define MUPHFASA_SIMULATION_SETUP_H
 
 #include "ISimulation.H"
+#include "LBM/BoundaryConditions.H"
 
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_PhysBCFunct.H>
 #include <AMReX_REAL.H>
 
 #include <memory>
@@ -21,7 +23,6 @@ namespace muphfasa {
 class InputParser;
 class GeometryHandler;
 class UnitConverter;
-class BCManager;
 
 // LatticeTag fixes the velocity set (D2Q9, D3Q15, D3Q19, or D3Q27), and
 // CollisionModel fixes the collision operator (BGK, TRT, MRT), both at
@@ -73,7 +74,9 @@ private:
     amrex::MultiFab m_vel;  // velocity:     AMREX_SPACEDIM components
 
     // ── Boundary conditions ───────────────────────────────────────────────
-    std::unique_ptr<BCManager> m_bc_manager;
+    // BCManager set once at setup, used to set m_phys_bc
+    using PhysBCFunctType = amrex::PhysBCFunct<amrex::GpuBndryFuncFab<BCManager<LatticeTag>>>;
+    std::unique_ptr<PhysBCFunctType> m_phys_bc;
 
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
