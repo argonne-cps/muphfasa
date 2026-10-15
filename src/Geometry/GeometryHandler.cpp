@@ -12,9 +12,28 @@
 
 namespace muphfasa {
 
-GeometryHandler::GeometryHandler(const InputParser& /*params*/)
+GeometryHandler::GeometryHandler(const InputParser& params)
 {
-    // TODO: read domain extents and periodicity flags via params, construct m_geom
+    const auto n_cells = params.ncells();
+    amrex::IntVect dom_hi;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        dom_hi[d] = n_cells[d] - 1;
+    }
+    const amrex::Box domain(amrex::IntVect(0), dom_hi);
+
+    amrex::ParmParse pp("geometry");
+
+    amrex::Vector<amrex::Real> prob_lo(AMREX_SPACEDIM), prob_hi(AMREX_SPACEDIM);
+    pp.getarr("prob_lo", prob_lo, 0, AMREX_SPACEDIM);
+    pp.getarr("prob_hi", prob_hi, 0, AMREX_SPACEDIM);
+    const amrex::RealBox real_box(prob_lo.data(), prob_hi.data());
+
+    amrex::Vector<int> is_periodic_in(AMREX_SPACEDIM, 0);
+    pp.getarr("is_periodic", is_periodic_in, 0, AMREX_SPACEDIM);
+    amrex::Array<int, AMREX_SPACEDIM> is_periodic{};
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { is_periodic[d] = is_periodic_in[d]; }
+
+    m_geom.define(domain, real_box, amrex::CoordSys::cartesian, is_periodic);
 }
 
 void GeometryHandler::initEB(const std::string& /*geom_type*/)
@@ -23,10 +42,11 @@ void GeometryHandler::initEB(const std::string& /*geom_type*/)
     m_has_eb = true;
 }
 
-void GeometryHandler::buildBoxArray(int /*max_grid_size*/)
+void GeometryHandler::buildBoxArray(int max_grid_size)
 {
-    // TODO: create BoxArray from m_geom.Domain(), chop to max_grid_size,
-    //       and build DistributionMapping with the default SFC strategy.
+    m_ba = amrex::BoxArray(m_geom.Domain());
+    m_ba.maxSize(max_grid_size);
+    m_dm = amrex::DistributionMapping(m_ba);
 }
 
 amrex::RealBox GeometryHandler::physDomain() const noexcept
