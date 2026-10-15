@@ -46,10 +46,6 @@ public:
     // ── Dimensionless parameters ─────────────────────────────────────────
     amrex::Real reynoldsNumber()    const noexcept;  // Re = U_ref * L_ref / nu_ref
 
-    // Templated on LatticeTag (for LatticeTag::cs2) and defined inline here,
-    // not in Units.cpp: a template member defined in a .cpp is only usable
-    // within that translation unit unless explicitly instantiated there for
-    // every LatticeTag a caller might use, which these were not.
     template <typename LatticeTag>
     amrex::Real machNumber() const noexcept  // Ma = U_lat / cs
     {

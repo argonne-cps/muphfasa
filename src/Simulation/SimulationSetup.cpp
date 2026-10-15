@@ -39,11 +39,8 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
                                               params.refViscosity(),
                                               params.refDensity(),
                                               max_N);
-    // Collision uses the directly-specified lbm.tau, not UnitConverter's
-    // relaxationTime<LatticeTag>() -- that value is derived from refLength/
-    // refVelocity/refViscosity and an internal lattice-velocity convention,
-    // which would silently override every regression test's explicit
-    // lbm.tau input with an unrelated value. omega = 1/tau, per BGK::collide.
+    
+    // Set collision param
     m_omega = amrex::Real(1.0) / m_params.tau();
 
     // Setup Geometry of Problem
