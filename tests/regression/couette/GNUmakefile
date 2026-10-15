@@ -3,20 +3,18 @@
 #
 # Usage:
 #   make                      # build test_couette (2-D, no MPI, by default)
-#   make DIM=2 USE_MPI=FALSE  # same, explicit
 #   ./test_couette2d.gnu.ex inputs
+#
+# Only DIM and USE_EB are overridden below -- everything else (DEBUG,
+# USE_MPI, USE_OMP, USE_CUDA, USE_HIP) already matches AMReX's own default,
+# and '.' doesn't need adding to VPATH_LOCATIONS: Make.rules prepends it
+# unconditionally.
 
 AMREX_HOME ?= $(CURDIR)/../../../external/amrex
 
 COMP ?= gnu
 DIM  ?= 2
-
-DEBUG    ?= FALSE
-USE_MPI  ?= FALSE
-USE_OMP  ?= FALSE
-USE_CUDA ?= FALSE
-USE_HIP  ?= FALSE
-USE_EB   ?= TRUE
+USE_EB ?= TRUE
 
 BL_NO_FORT = TRUE
 
@@ -24,7 +22,7 @@ EBASE = test_couette
 
 SRC_DIR := ../../../src
 
-VPATH_LOCATIONS   += . $(SRC_DIR)/LBM $(SRC_DIR)/Geometry $(SRC_DIR)/IO $(SRC_DIR)/Simulation
+VPATH_LOCATIONS   += $(SRC_DIR)/LBM $(SRC_DIR)/Geometry $(SRC_DIR)/IO $(SRC_DIR)/Simulation
 INCLUDE_LOCATIONS += $(SRC_DIR) $(SRC_DIR)/LBM $(SRC_DIR)/Geometry $(SRC_DIR)/IO $(SRC_DIR)/Simulation
 
 CEXE_sources += test_couette.cpp
