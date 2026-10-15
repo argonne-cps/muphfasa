@@ -49,33 +49,38 @@ struct MovingWallKernel
 #if (AMREX_SPACEDIM == 2)
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
-                    f(iv, n) = f(iv[0]-bound, iv[1], LatticeTag::opposite(n)) 
-                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1]);
+                    int opp_n = LatticeTag::opposite(n);
+                    f(iv, n) = f(iv[0]-bound, iv[1], opp_n) 
+                             + wallContrib(n, LatticeTag::cy(opp_n), rho_wall, Uwall[1]);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1]-bound, LatticeTag::opposite(n))
-                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0]);
+                    int opp_n = LatticeTag::opposite(n);
+                    f(iv, n) = f(iv[0], iv[1]-bound, opp_n)
+                             + wallContrib(n, LatticeTag::cx(opp_n), rho_wall, Uwall[0]);
                 }
             }
 #else
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
-                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], LatticeTag::opposite(n))
-                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1])
-                             + wallContrib(n, LatticeTag::cz(n), rho_wall, Uwall[2]);
+                    int opp_n = LatticeTag::opposite(n);
+                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], opp_n)
+                             + wallContrib(n, LatticeTag::cy(opp_n), rho_wall, Uwall[1])
+                             + wallContrib(n, LatticeTag::cz(opp_n), rho_wall, Uwall[2]);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], LatticeTag::opposite(n))
-                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0])
-                             + wallContrib(n, LatticeTag::cz(n), rho_wall, Uwall[2]);
+                    int opp_n = LatticeTag::opposite(n);
+                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], opp_n)
+                             + wallContrib(n, LatticeTag::cx(opp_n), rho_wall, Uwall[0])
+                             + wallContrib(n, LatticeTag::cz(opp_n), rho_wall, Uwall[2]);
                 }
             } else if (dir == 2) {
                 if (LatticeTag::cz(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, LatticeTag::opposite(n))
-                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0])
-                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1]);
+                    int opp_n = LatticeTag::opposite(n);
+                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, opp_n)
+                             + wallContrib(n, LatticeTag::cx(opp_n), rho_wall, Uwall[0])
+                             + wallContrib(n, LatticeTag::cy(opp_n), rho_wall, Uwall[1]);
                 }
             }
 #endif
