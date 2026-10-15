@@ -84,3 +84,4 @@ function(add_regression_analysis_test name)
 endfunction()
 
 add_regression_analysis_test(couette)
+add_regression_analysis_test(tgv2d)
