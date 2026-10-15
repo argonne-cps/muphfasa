@@ -46,9 +46,9 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
 
     const int n_ghost = params.nGhost();
     m_f.define  (m_ba, m_dm, LatticeTag::Q,  n_ghost);
-    m_feq.define(m_ba, m_dm, LatticeTag::Q,  n_ghost);
-    m_rho.define(m_ba, m_dm, 1,              n_ghost);
-    m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, n_ghost);
+    m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
+    m_rho.define(m_ba, m_dm, 1,              0);
+    m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
 
     buildBCManager();
 }
