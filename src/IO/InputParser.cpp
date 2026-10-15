@@ -151,19 +151,19 @@ bool InputParser::useEB() const
 
 std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
 {
-    // bc.lo = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
-    // bc.hi = NoSlip Outflow Periodic
+    // bc.lo_type = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
+    // bc.hi_type = NoSlip Outflow Periodic
     amrex::ParmParse pp("bc");
 
     std::vector<std::string> lo, hi;
-    pp.getarr("lo", lo);
-    pp.getarr("hi", hi);
+    pp.getarr("lo_type", lo);
+    pp.getarr("hi_type", hi);
 
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
         static_cast<int>(lo.size()) == AMREX_SPACEDIM &&
         static_cast<int>(hi.size()) == AMREX_SPACEDIM,
-        "InputParser::bcNames: bc.lo and bc.hi must each list exactly "
-        "AMREX_SPACEDIM names (one per direction)");
+        "InputParser::bcNames: bc.lo_type and bc.hi_type must each list "
+        "exactly AMREX_SPACEDIM names (one per direction)");
 
     // Order matches muphfasa::faceIndex(dir, bound): [xlo, xhi, ylo, yhi,
     // zlo, zhi].

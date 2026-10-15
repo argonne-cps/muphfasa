@@ -48,8 +48,8 @@ public:
     bool        useEB()          const;
 
     // ── Boundary conditions ───────────────────────────────────────────────
-    // bc.lo = <x> [<y> [<z>]], bc.hi = <x> [<y> [<z>]], one name per
-    // direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
+    // bc.lo_type = <x> [<y> [<z>]], bc.hi_type = <x> [<y> [<z>]], one name
+    // per direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
     // Returned array order matches muphfasa::faceIndex(dir, bound) in
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
