@@ -1,11 +1,10 @@
 // NoSlipKernel.H — Halfway bounce-back, ghost-fill form.
 //
-// Derivation (BC_implementation_plan.md Step 1):
 //
 // The wall sits halfway between the last fluid node x and the first ghost
 // node g = x + bound*e_dir (bound = -1 for a lo-`dir` wall, +1 for a hi-`dir`
-// wall). This kernel is only ever invoked by AMReX for ghost cells (see the
-// `BCManager` contract), so `iv` below is always such a `g`.
+// wall). This kernel is only ever invoked by AMReX for ghost cells so `iv` 
+//below is always such a `g`.
 //
 // We want the ghost cell to hold, for every population n whose velocity
 // points into the wall along `dir` (c_n[dir] == -bound, i.e. n would stream
@@ -26,6 +25,8 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
+#include "MovingWall.H"
+
 namespace muphfasa {
 
 template <typename LatticeTag>
@@ -38,33 +39,8 @@ struct NoSlipKernel
                        amrex::Array4<amrex::Real> const& f,
                        int dir, int bound) noexcept
     {
-        for (int n = 0; n < LatticeTag::Q; ++n) {
-#if (AMREX_SPACEDIM == 2)
-            if (dir == 0) {
-                if (LatticeTag::cx(n) == -bound) {
-                    f(iv, n) = f(iv[0]-bound, iv[1], LatticeTag::opposite(n));
-                }
-            } else if (dir == 1) {
-                if (LatticeTag::cy(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1]-bound, LatticeTag::opposite(n));
-                }
-            }
-#else
-            if (dir == 0) {
-                if (LatticeTag::cx(n) == -bound) {
-                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], LatticeTag::opposite(n));
-                }
-            } else if (dir == 1) {
-                if (LatticeTag::cy(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], LatticeTag::opposite(n));
-                }
-            } else if (dir == 2) {
-                if (LatticeTag::cz(n) == -bound) {
-                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, LatticeTag::opposite(n));
-                }
-            }
-#endif
-        }
+    
+        MovingWallKernel::apply(iv, f, dir, bound, 1.0_rt, AMREX_D_DECL{0.0_rt, 0.0_rt, 0.0_rt});
     }
 };
 

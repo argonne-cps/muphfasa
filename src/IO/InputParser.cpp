@@ -131,6 +131,23 @@ std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
     return names;
 }
 
+amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> Uwall() {
+    amrex::ParmParse pp("bc");
+
+    std::vector<amrex::Real> lo_Uwall, hi_Uwall;
+    pp.getarr("lo_Uwall", lo_Uwall);
+    pp.getarr("hi_Uwall", hi_Uwall);
+
+    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> Uwall{};
+
+    for (int dir=0; dir < AMREX_SPACEDIM; ++dir) {
+        Uwall[2*dir] =  lo_Uwall[dir];
+        Uwall[2*dir + 1] =  hi_Uwall[dir];
+    }
+
+    return Uwall;
+}
+
 int InputParser::plotInterval()       const { return 100; }
 int InputParser::checkpointInterval() const { return 1000; }
 

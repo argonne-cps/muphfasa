@@ -53,6 +53,7 @@ public:
     // Returned array order matches muphfasa::faceIndex(dir, bound) in
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
+    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> Uwall() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;

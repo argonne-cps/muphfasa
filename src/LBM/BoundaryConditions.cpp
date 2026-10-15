@@ -14,11 +14,12 @@ namespace muphfasa {
 
 lbmBCtype parselbmBCtype(const std::string& name)
 {
-    if (name == "NoSlip")  { return lbmBCtype::NoSlip;  }
-    if (name == "Inflow")  { return lbmBCtype::Inflow;  }
-    if (name == "Outflow") { return lbmBCtype::Outflow; }
+    if (name == "MovingWall")  { return lbmBCtype::MovingWall;  }
+    if (name == "NoSlip")      { return lbmBCtype::NoSlip;  }
+    if (name == "Inflow")      { return lbmBCtype::Inflow;  }
+    if (name == "Outflow")     { return lbmBCtype::Outflow; }
     amrex::Abort("parselbmBCtype: unrecognized BC name \"" + name +
-                 "\" (expected NoSlip, Inflow, or Outflow; Periodic faces "
+                 "\" (expected MovingWall, NoSlip, Inflow, or Outflow; Periodic faces "
                  "must be filtered out before calling this)");
     return lbmBCtype::NoSlip; // unreachable
 }

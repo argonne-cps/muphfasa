@@ -11,6 +11,7 @@
 #ifndef MUPHFASA_BOUNDARY_CONDITIONS_H
 #define MUPHFASA_BOUNDARY_CONDITIONS_H
 
+#include "BCTypes/MovingWall.H"
 #include "BCTypes/NoSlipKernel.H"
 #include "BCTypes/InflowKernel.H"
 #include "BCTypes/OutflowKernel.H"
@@ -35,7 +36,7 @@ inline constexpr int faceIndex(int dir, int bound) noexcept {
 
 // Our own dispatch tag — never amrex::BCType. Adding a BC means adding an
 // enumerator here, nowhere else in amrex's namespace.
-enum class lbmBCtype { NoSlip, Inflow, Outflow };
+enum class lbmBCtype { MovingWall, NoSlip, Inflow, Outflow };
 
 // The only amrex::BCType code our custom BCs ever use. Chosen from the
 // `user_*` range AMReX reserves for exactly this purpose; never ext_dir/
@@ -98,6 +99,12 @@ public:
             // amrex_code is just our sentinel here; the real kind comes
             // from our own table.
             switch (m_face_bc[faceIndex(dir, bound)]) {
+                case lbmBCtype::MovingWall:
+                    MovingWallKernel<LatticeTag>::apply(iv, dest, dir, bound,
+                                                        m_face_rho_wall[faceIndex(dir, bound)],
+                                                        m_face_Uwall[faceIndex(dir, bound)]);
+                    break;
+
                 case lbmBCtype::NoSlip:
                     NoSlipKernel<LatticeTag>::apply(iv, dest, dir, bound);
                     break;
@@ -122,8 +129,18 @@ public:
         m_face_bc[faceIndex(dir, bound)] = kind;
     }
 
+    void setFaceDensity(int dir, int bound, amrex::Real rho) {
+        m_face_rho_wall[faceIndex(dir, bound)] = rho;
+    }
+
+    void setFaceUwall(int dir, int bound, amrex::Real Uwall) {
+        m_face_Uwall[faceIndex(dir, bound)] = Uwall;
+    }
+
 private:
     amrex::GpuArray<lbmBCtype, 2 * AMREX_SPACEDIM> m_face_bc{};
+    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_rho_wall{};
+    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_Uwall{};
 };
 
 // Face name -> our own dispatch enum. 
