@@ -31,6 +31,21 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
 #endif
 }
 
+// u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q, for a single cell.
+// Writes AMREX_SPACEDIM velocity components into vel_arr(i,j,k,*).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void computeVelocityCell(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const& f_arr,
+                         const amrex::Real rho,
+                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>& vel_vec) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    vel_vec = computeVelocityCell2D<LatticeTag>(f_arr, rho);
+#else
+    vel_vec = computeVelocityCell3D<LatticeTag>(f_arr, rho);
+#endif
+}
+
 // ── computeDensity ────────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeDensity(const amrex::Box& box,

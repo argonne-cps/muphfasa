@@ -52,6 +52,23 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
                    const amrex::MultiFab& f_mf,
                    amrex::Real            omega);
 
+// Per-tile kernel fused stream/collide: pulls (streams) 
+// then computes rho, u, and f^eq per cell and immediately
+// relaxes f toward it into fstar_arr. rho/u/feq are local per-cell scratch,
+// not written out to MultiFabs
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullArr(const amrex::Box& box,
+                    amrex::Array4<const amrex::Real> const& fin_arr,
+                    amrex::Array4<const amrex::Real> const& fout_arr,
+                    amrex::Real omega);
+
+// Full stream/collision step: Pulls from f then collides w/ fused rho/u/feq/fstar computation in one MFIter pass.
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullMF(const amrex::MultiFab& fin_mf,
+                       amrex::MultiFab& fout_mf,
+                       amrex::Real omega);
+
+
 } // namespace muphfasa
 
 #endif // MUPHFASA_COLLISION_H

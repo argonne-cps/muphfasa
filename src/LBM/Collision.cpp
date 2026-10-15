@@ -104,6 +104,66 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
 }
 
 
+// ── pullCollideFullArr (per-tile kernel) ──────────────────────────────────────
+// Pull (stream) then Fuses rho/u/feq into per-cell scratch (no intermediate MultiFabs).
+template <typename LatticeTag, typename CollisionModel>
+void collideFullArr(const amrex::Box& box,
+                    amrex::Array4<const amrex::Real> const& fin_arr,
+                    amrex::Array4<amrex::Real> const& fout_arr,
+                    amrex::Real omega)
+{
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+
+        // scratch array
+        amrex::GpuArray<amrex::Real, LatticeTag::Q> f_arr;
+        // stream fin --> f (scratch)
+        for (int n=0; n < LatticeTag::Q; ++n){
+            f_arr[n] = streamCell(fin_arr, i, j, k, n)
+        }
+
+        // calc rho
+        const amrex::Real rho = computeDensityCell<LatticeTag>(f_arr);
+
+        // calc u 
+#if (AMREX_SPACEDIM == 2)
+        const auto u = computeVelocityCell2D<LatticeTag>(f_arr, rho);
+#else
+        const auto u = computeVelocityCell3D<LatticeTag>(f_arr, rho);
+#endif
+
+        // calc fstar for each comp
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+#if (AMREX_SPACEDIM == 2)
+            const amrex::Real feq = computeEquilibriumCell2D<LatticeTag>(rho, u, n);
+#else
+            const amrex::Real feq = computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+#endif
+            fout_arr(i, j, k, n) = CollisionModel::collide(f_arr[n], feq, omega);
+        }
+    });
+}
+
+// ── MultiFab-level Full Collide dispatch ──────────────────────────────────
+template <typename LatticeTag, typename CollisionModel>
+void collideFullMF(amrex::MultiFab&       fstar_mf,
+                   const amrex::MultiFab& f_mf,
+                   amrex::Real            omega)
+{
+    #ifdef _OPENMP
+    #pragma omp parallel
+    #endif
+    for (amrex::MFIter mfi(f_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box tileBox = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& fstar_arr = fstar_mf[mfi].array();
+        amrex::Array4<amrex::Real const> const& f_arr = f_mf[mfi].const_array();
+
+        collideFullArr<LatticeTag, CollisionModel>(tileBox, fstar_arr, f_arr, omega);
+    }
+}
+
+
+
 // ── Explicit instantiations — BGK ────────────────────────────────────────
 template void BGK::collideArr<D2Q9>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);
 template void BGK::collideArr<D3Q15>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real);

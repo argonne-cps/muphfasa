@@ -32,6 +32,18 @@ amrex::Real computeDensityCell(amrex::Array4<const amrex::Real> const& f_arr,
     return rho;
 }
 
+// rho = sum_q f_q, for a single cell.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::Real computeDensityCell(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const& f_arr) noexcept
+{
+    amrex::Real rho = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        rho += f_arr[n];
+    }
+    return rho;
+}
+
 // u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q, for a single cell.
 // Writes AMREX_SPACEDIM velocity components into vel_arr(i,j,k,*).
 template <typename LatticeTag>
@@ -40,6 +52,14 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
                          const amrex::Real rho,
                          amrex::Array4<amrex::Real> const& vel_arr,
                          int i, int j, int k) noexcept;
+
+// u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q, for a single cell.
+// Writes AMREX_SPACEDIM velocity components into vel_arr(i,j,k,*).
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void computeVelocityCell(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const& f_arr,
+                         const amrex::Real rho,
+                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& vel_vec) noexcept;
 
 // GpuArray-returning variants: same math, returned as local scratch instead
 // of written into an Array4. Used by fused kernels with no MultiFab for u.
@@ -60,6 +80,21 @@ amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex:
 
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const& f_arr,
+                                                       const amrex::Real rho) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr[n];
+        uy += LatticeTag::cy(n) * f_arr[n];
+    }
+    return {ux / rho, uy / rho};
+}
+
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
                                                        const amrex::Real rho,
                                                        int i, int j, int k) noexcept
@@ -71,6 +106,22 @@ amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex:
         ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
         uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
         uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
+    }
+    return {ux / rho, uy / rho, uz / rho};
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const& f_arr,
+                                                       const amrex::Real rho) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    amrex::Real uz = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr[n];
+        uy += LatticeTag::cy(n) * f_arr[n];
+        uz += LatticeTag::cz(n) * f_arr[n];
     }
     return {ux / rho, uy / rho, uz / rho};
 }
