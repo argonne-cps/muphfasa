@@ -22,6 +22,10 @@
 //      profile over time and check its fitted decay rate against the
 //      analytic one.
 //
+// Also writes every sampled (time, y, u_sim, u_analytic) point to
+// couette_profiles.csv in the working directory, unconditionally (even if a
+// check below fails) -- see plot_couette.py to render it.
+//
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -34,6 +38,7 @@
 #include "Simulation/SimulationFactory.H"
 
 #include <cmath>
+#include <fstream>
 #include <stdexcept>
 #include <vector>
 
@@ -140,6 +145,28 @@ int main(int argc, char* argv[])
         }
 
         require(!snapshot_profiles.empty(), "no snapshots recorded");
+
+        // ── Dump profile data for plotting (see plot_couette.py) ─────────
+        // Written unconditionally, before the pass/fail checks below, so
+        // the data is available for inspection even if a check fails.
+        {
+            std::ofstream csv("couette_profiles.csv");
+            csv.precision(17); // full double precision -- the n=1 mode amplitude
+                               // decays to ~1e-8 and smaller; default precision
+                               // (6 digits) would floor it artificially.
+            csv << "# H=" << H << " U0=" << U0 << " nu=" << nu << " Ny=" << Ny << "\n";
+            csv << "time,y,u_sim,u_analytic\n";
+            for (std::size_t k = 0; k < snapshot_profiles.size(); ++k) {
+                const amrex::Real t = snapshot_times[k];
+                for (int j = 0; j < Ny; ++j) {
+                    const amrex::Real y = j + amrex::Real(0.5);
+                    csv << t << ',' << y << ',' << snapshot_profiles[k][j] << ','
+                        << analyticCouette(y, H, U0, nu, t) << '\n';
+                }
+            }
+        }
+        amrex::Print() << "Wrote couette_profiles.csv ("
+                       << snapshot_profiles.size() << " snapshots)\n";
 
         // ── Check 1: steady state ────────────────────────────────────────
         const auto& final_profile = snapshot_profiles.back();
