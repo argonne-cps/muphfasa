@@ -33,17 +33,21 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     int max_N = Ncells[0];
     for (auto n : Ncells) { max_N = (n > max_N) ? n : max_N; }
 
-    // Set phys/lattice units
+    // Set phys/lattice units. lbm.u_lat / lbm.tau (both optional) let the
+    // user pin the lattice spacing directly; UnitConverter checks they're
+    // mutually consistent (and with the other physical scales) if both are
+    // given, and falls back to its own default u_lat if neither is.
     m_units = std::make_unique<UnitConverter>(params.refLength(),
                                               params.refVelocity(),
                                               params.refViscosity(),
                                               params.refDensity(),
-                                              max_N);
-    
-    // Set collision param: omega = 1/tau, with tau derived from the
-    // physical reference scales via UnitConverter (not a direct lbm.tau
-    // input -- InputParser has no such accessor).
-    m_omega = amrex::Real(1.0) / m_units->relaxationTime<LatticeTag>();
+                                              max_N,
+                                              LatticeTag::cs2,
+                                              params.latticeVelocity(),
+                                              params.relaxationTime());
+
+    // Set collision param: omega = 1/tau.
+    m_omega = amrex::Real(1.0) / m_units->relaxationTime();
 
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);

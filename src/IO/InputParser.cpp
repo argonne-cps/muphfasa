@@ -75,6 +75,22 @@ std::string InputParser::collisionModel() const
     return val;
 }
 
+std::optional<amrex::Real> InputParser::relaxationTime() const
+{
+    amrex::ParmParse pp("lbm");
+    amrex::Real val{};
+    if (pp.query("tau", val)) { return val; }
+    return std::nullopt;
+}
+
+std::optional<amrex::Real> InputParser::latticeVelocity() const
+{
+    amrex::ParmParse pp("lbm");
+    amrex::Real val{};
+    if (pp.query("u_lat", val)) { return val; }
+    return std::nullopt;
+}
+
 amrex::Real InputParser::reynoldsNumber() const
 {
     amrex::ParmParse pp("units");

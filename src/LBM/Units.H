@@ -9,6 +9,7 @@
 #include <AMReX_REAL.H>
 
 #include <cmath>
+#include <optional>
 
 namespace muphfasa {
 
@@ -21,13 +22,29 @@ public:
     // nu_ref [m^2/s]   : kinematic viscosity
     // rho_ref [kg/m^3] : reference density
     // N_ref            : number of lattice cells spanning L_ref (resolution)
-    // U_lat [lu/lt]     : Lattice velocity in dimensionless lattice units (defaults to 0.1)
+    // cs2              : lattice sound speed squared (LatticeTag::cs2).
+    //                    UnitConverter isn't itself templated on LatticeTag,
+    //                    so the caller (which knows LatticeTag) passes this
+    //                    through directly.
+    //
+    // dt is pinned by exactly one of two user choices, both optional:
+    //   u_lat : the dimensionless lattice reference velocity directly.
+    //   tau   : the BGK relaxation time directly (converted to u_lat via
+    //           nu_lat = (tau-0.5)*cs2, then u_lat = nu_lat*U_ref*dx/nu_ref).
+    // Supplying both is allowed only if they agree (within a relative
+    // tolerance) once the other physical scales and grid resolution are
+    // accounted for -- amrex::Abort otherwise, since that means the input
+    // file is asking for two different, incompatible lattice spacings.
+    // Supplying neither falls back to the conventional default lattice
+    // velocity (0.1).
     UnitConverter(amrex::Real L_ref,
                   amrex::Real U_ref,
                   amrex::Real nu_ref,
                   amrex::Real rho_ref,
                   int         N_ref,
-                  amrex::Real U_lat=amrex::Real(0.1));
+                  amrex::Real cs2,
+                  std::optional<amrex::Real> u_lat = std::nullopt,
+                  std::optional<amrex::Real> tau   = std::nullopt);
 
     // ── Physical → lattice ───────────────────────────────────────────────
     amrex::Real toLatticeLength   (amrex::Real x_phys)   const noexcept;
@@ -44,19 +61,9 @@ public:
     amrex::Real toPhysicalDensity  (amrex::Real rho_lat) const noexcept;
 
     // ── Dimensionless parameters ─────────────────────────────────────────
-    amrex::Real reynoldsNumber()    const noexcept;  // Re = U_ref * L_ref / nu_ref
-
-    template <typename LatticeTag>
-    amrex::Real machNumber() const noexcept  // Ma = U_lat / cs
-    {
-        return m_u_lat / std::sqrt(LatticeTag::cs2);
-    }
-
-    template <typename LatticeTag>
-    amrex::Real relaxationTime() const noexcept  // tau = nu_lat/cs2 + 0.5
-    {
-        return m_nu_lat / LatticeTag::cs2 + amrex::Real(0.5);
-    }
+    amrex::Real reynoldsNumber()  const noexcept;  // Re = U_ref * L_ref / nu_ref
+    amrex::Real machNumber()      const noexcept;  // Ma = u_lat / cs
+    amrex::Real relaxationTime()  const noexcept;  // tau = nu_lat/cs2 + 0.5
 
     // ── Lattice spacings ────────────────────────────────────────────────
     amrex::Real dx() const noexcept { return m_dx; }  // lattice spacing [m]
@@ -64,6 +71,7 @@ public:
 
 private:
     amrex::Real m_L_ref, m_U_ref, m_nu_ref, m_rho_ref;
+    amrex::Real m_cs2;
     amrex::Real m_dx, m_dt;
     amrex::Real m_u_lat;   // lattice reference velocity (Ma * cs)
     amrex::Real m_nu_lat;  // lattice kinematic viscosity
