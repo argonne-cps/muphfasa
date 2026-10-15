@@ -45,6 +45,8 @@ public:
 
     // ── Geometry ─────────────────────────────────────────────────────────
     std::string geometryType()   const;   // "box" | "sphere" | "stl" | …
+    std::vector<amrex::Real> geometryProbLo()   const;   // [m] AMREX_SPACEDIM entries
+    std::vector<amrex::Real> geometryProbHi()   const;   // [m] AMREX_SPACEDIM entries
     bool        useEB()          const;
 
     // ── Boundary conditions ───────────────────────────────────────────────
