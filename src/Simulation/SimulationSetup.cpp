@@ -68,22 +68,19 @@ void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 {
-    // TODO:
-    //   1. computeEquilibriumMF<LatticeTag>            (rho, vel -> feq)
-    //   2. collideMF<LatticeTag, CollisionModel>        (f, feq, tau)
-    //   3. fillGhostCells                   (MPI halo exchange)
-    //   4. streamInPlace<LatticeTag>        (f)
-    //   5. computeMacroscopic<LatticeTag>   (f -> rho, vel)
-    //   6. m_time += 1.0                    (lattice time unit)
     amrex::ignore_unused(step);
 
-    // compute collision
+    const amrex::Real omega = amrex::Real(1.0) / m_params.tau();
 
-    // fill ghost cells
+    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
+    collideMF<LatticeTag, CollisionModel>(m_f, m_feq, omega);
 
-    // do streaming
+    fillGhostCells();
+    streamInPlace<LatticeTag>(m_f, m_geom);
 
-    // optional plotting
+    computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+
+    m_time += amrex::Real(1.0);
 }
 
 template <typename LatticeTag, typename CollisionModel>

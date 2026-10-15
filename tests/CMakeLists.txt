@@ -60,3 +60,27 @@ endfunction()
 
 add_regression_test(poiseuille)
 add_regression_test(lid_driven_cavity)
+
+# Regression tests that need their own analysis code (e.g. comparing against
+# an analytic solution) instead of just checking the solver runs to
+# completion: build a dedicated executable, same idiom as the unit tests
+# above, and run it from its regression/<name>/ directory so it can find its
+# own "inputs" file via a relative path.
+function(add_regression_analysis_test name)
+    add_executable(test_${name} regression/${name}/test_${name}.cpp ${SOLVER_SOURCES_NO_MAIN})
+
+    target_include_directories(test_${name} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_${name} PRIVATE AMReX::amrex_${muphfasa_DIM}d)
+
+    if(AMReX_CUDA)
+        setup_target_for_cuda_compilation(test_${name})
+    endif()
+
+    add_test(
+        NAME regression_${name}
+        COMMAND $<TARGET_FILE:test_${name}>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/regression/${name}
+    )
+endfunction()
+
+add_regression_analysis_test(couette)

@@ -1,0 +1,52 @@
+# Regression test: Plane Couette flow (2-D channel, wall-driven shear).
+# Bottom wall (y=lo) stationary (NoSlip); top wall (y=hi) moving at U0
+# (MovingWall); periodic in x. No pressure gradient.
+#
+# Steady-state analytic solution: linear velocity profile
+#   u(y) = U0 * y/H
+# Time-dependent startup (impulsively-started plate, both walls held fixed
+# for t<=0, top wall set to U0 for t>0), solving du/dt = nu * d^2u/dy^2:
+#   u(y,t)/U0 = y/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*y/H)
+#                     * exp(-n^2*pi^2*nu*t/H^2)
+# which is what tests/regression/couette/test_couette.cpp checks the
+# simulated profile against, both at late times (steady state) and
+# throughout the startup transient (time-dependent convergence).
+#
+# H (wall-to-wall distance, lattice units) = grid.ncells[1], per the
+# standard halfway-bounce-back convention (wall sits half a cell beyond
+# the last fluid node on each side).
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells      = 4 32     # Nx Ny (periodic in x, walls at y=0 and y=H)
+grid.max_grid_size = 32
+grid.n_ghost     = 1
+
+# ── Simulation ─────────────────────────────────────────────────────────────
+sim.max_step     = 20000
+sim.stop_time    = -1.0      # run to max_step
+
+# ── LBM ────────────────────────────────────────────────────────────────────
+lbm.lattice_type = D2Q9
+lbm.tau          = 0.8       # nu_lat = cs2*(tau-0.5) = 0.1 [lattice units]
+
+# ── Physical units ─────────────────────────────────────────────────────────
+units.Re         = 16.0
+units.Ma         = 0.05
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+# x: periodic
+# y: NoSlip at y=lo, MovingWall at y=hi with wall velocity (U0, 0)
+bc.lo_type = Periodic  NoSlip
+bc.hi_type = Periodic  MovingWall
+bc.hi_wall_velocity = 0.05  0.0   # (vx, vy) in lattice units -- this is U0
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 0.125  1.0
+geometry.is_periodic = 1   0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 2000
+amr.chk_int         = 10000
+amr.plot_file       = plt
+amr.check_file      = chk
