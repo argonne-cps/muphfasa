@@ -14,9 +14,9 @@
 //
 //     f(g, n) = f(x, opposite(n)) + wall_contrib(opposite(n))
 //
-// where, 
-//     wall_contrib(m) = -2 * rho_wall * weight(m) * sum_i (c_i(m) * U_wall_i)
-// 
+// where,
+//     wall_contrib(m) = -2 * rho_wall * weight(m) * sum_i (c_i(m) * U_wall_i) / cs2
+//
 // wall contribution depends on the **opposite** direction population and the
 // velocity and density at the wall. We only consider walls moving perpendicular
 // to the face in this implementation. (No expanding/compressing walls)
@@ -90,7 +90,7 @@ struct MovingWallKernel
     private:
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real wallContrib(int n, int c_dir, amrex::Real rho_wall, amrex::Real u) {
-        return -2. * rho_wall * LatticeTag::weights(n) * c_dir * u;
+        return -2. * rho_wall * LatticeTag::weights(n) * c_dir * u * LatticeTag::cs2inv;
     }
 };
 

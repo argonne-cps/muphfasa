@@ -22,13 +22,6 @@
 //      profile over time and check its fitted decay rate against the
 //      analytic one.
 //
-// NOTE: requires the MovingWall boundary condition (bc.hi_type = MovingWall
-// in ./inputs), which is still being implemented elsewhere as of this
-// writing. Until that lands, this test aborts at BC setup with
-// "parselbmBCtype: unrecognized BC name \"MovingWall\"" -- that failure is
-// expected and is not a bug in this test; it confirms the test is wired up
-// correctly and is just waiting on that feature.
-
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
@@ -36,6 +29,7 @@
 #include <AMReX_Print.H>
 
 #include "IO/InputParser.H"
+#include "LBM/BoundaryConditions.H"
 #include "Simulation/ISimulation.H"
 #include "Simulation/SimulationFactory.H"
 
@@ -128,13 +122,8 @@ int main(int argc, char* argv[])
         const amrex::Real tau = params.tau();
         const amrex::Real nu  = (tau - amrex::Real(0.5)) * kCs2;
 
-        amrex::Real U0 = amrex::Real(0.05);
-        {
-            amrex::Vector<amrex::Real> hi_vel;
-            amrex::ParmParse pp("bc");
-            pp.getarr("hi_wall_velocity", hi_vel, 0, AMREX_SPACEDIM);
-            U0 = hi_vel[0];
-        }
+        // y-hi face, x-component (tangential velocity of the moving wall).
+        const amrex::Real U0 = params.Uwall()[faceIndex(1, 1)][0];
 
         const int max_step           = params.maxStep();
         const int snapshot_interval  = 200;

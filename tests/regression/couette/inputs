@@ -38,12 +38,14 @@ units.Ma         = 0.05
 # y: NoSlip at y=lo, MovingWall at y=hi with wall velocity (U0, 0)
 bc.lo_type = Periodic  NoSlip
 bc.hi_type = Periodic  MovingWall
-bc.hi_wall_velocity = 0.05  0.0   # (vx, vy) in lattice units -- this is U0
+bc.hiy_Uwall = 0.05  0.0   # (vx, vy) in lattice units -- vx is U0
 
 # ── Geometry ───────────────────────────────────────────────────────────────
+# is_periodic is derived from bc.lo_type/bc.hi_type (GeometryHandler), not
+# read from a separate key -- these prob_lo/prob_hi values are only used to
+# set the physical domain extents for plotfile output.
 geometry.prob_lo    = 0.0  0.0
 geometry.prob_hi    = 0.125  1.0
-geometry.is_periodic = 1   0
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 2000

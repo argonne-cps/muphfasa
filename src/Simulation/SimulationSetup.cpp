@@ -31,7 +31,7 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // get Ncells in largest direction
     auto Ncells = params.ncells();
     int max_N = Ncells[0];
-    for (auto n : Ncells) { max_N = n ? n > max_N : max_N; }
+    for (auto n : Ncells) { max_N = (n > max_N) ? n : max_N; }
 
     // Set phys/lattice units
     m_units = std::make_unique<UnitConverter>(params.refLength(),
@@ -39,8 +39,12 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
                                               params.refViscosity(),
                                               params.refDensity(),
                                               max_N);
-    // set collision param
-    m_omega = m_units->relaxationTime();
+    // Collision uses the directly-specified lbm.tau, not UnitConverter's
+    // relaxationTime<LatticeTag>() -- that value is derived from refLength/
+    // refVelocity/refViscosity and an internal lattice-velocity convention,
+    // which would silently override every regression test's explicit
+    // lbm.tau input with an unrelated value. omega = 1/tau, per BGK::collide.
+    m_omega = amrex::Real(1.0) / m_params.tau();
 
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
@@ -88,11 +92,8 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     fillGhostCells();
     streamInPlace<LatticeTag>(m_f, m_geom);
 
-    // compute macro 
+    // compute macro
     computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
-
-    // writeout plot
-    writeOutput(step);
 
     m_time += amrex::Real(1.0);
 }

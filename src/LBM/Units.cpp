@@ -41,16 +41,4 @@ amrex::Real UnitConverter::reynoldsNumber() const noexcept
     return m_U_ref * m_L_ref / m_nu_ref;
 }
 
-template <typename LatticeTag>
-amrex::Real UnitConverter::machNumber() const noexcept
-{
-    return m_u_lat * std::sqrt(LatticeTag::cs2);
-}
-
-template <typename LatticeTag>
-amrex::Real UnitConverter::relaxationTime() const noexcept
-{
-    return m_nu_lat / LatticeTag::cs2 + amrex::Real(0.5);
-}
-
 } // namespace muphfasa

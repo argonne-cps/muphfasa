@@ -8,6 +8,8 @@
 
 #include <AMReX_REAL.H>
 
+#include <cmath>
+
 namespace muphfasa {
 
 class UnitConverter
@@ -43,10 +45,22 @@ public:
 
     // ── Dimensionless parameters ─────────────────────────────────────────
     amrex::Real reynoldsNumber()    const noexcept;  // Re = U_ref * L_ref / nu_ref
+
+    // Templated on LatticeTag (for LatticeTag::cs2) and defined inline here,
+    // not in Units.cpp: a template member defined in a .cpp is only usable
+    // within that translation unit unless explicitly instantiated there for
+    // every LatticeTag a caller might use, which these were not.
     template <typename LatticeTag>
-    amrex::Real machNumber()        const noexcept;  // Ma = U_lat / cs  
+    amrex::Real machNumber() const noexcept  // Ma = U_lat / cs
+    {
+        return m_u_lat / std::sqrt(LatticeTag::cs2);
+    }
+
     template <typename LatticeTag>
-    amrex::Real relaxationTime()    const noexcept;  // tau = nu_lat/cs2 + 0.5
+    amrex::Real relaxationTime() const noexcept  // tau = nu_lat/cs2 + 0.5
+    {
+        return m_nu_lat / LatticeTag::cs2 + amrex::Real(0.5);
+    }
 
     // ── Lattice spacings ────────────────────────────────────────────────
     amrex::Real dx() const noexcept { return m_dx; }  // lattice spacing [m]
