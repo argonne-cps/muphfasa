@@ -60,6 +60,7 @@ private:
     // ── Input and unit conversion ─────────────────────────────────────────
     const InputParser&           m_params;
     std::unique_ptr<UnitConverter> m_units;
+    amrex::Real m_omega{};
 
     // ── AMReX grid objects ────────────────────────────────────────────────
     std::unique_ptr<GeometryHandler> m_geom_handler;

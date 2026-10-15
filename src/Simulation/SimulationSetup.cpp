@@ -39,6 +39,8 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
                                               params.refViscosity(),
                                               params.refDensity(),
                                               max_N);
+    // set collision param
+    m_omega = m_units->relaxationTime();
 
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
@@ -78,15 +80,19 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 {
     amrex::ignore_unused(step);
 
-    const amrex::Real omega = amrex::Real(1.0) / m_params.tau();
-
+    // collide
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
-    collideMF<LatticeTag, CollisionModel>(m_f, m_feq, omega);
+    collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_omega);
 
+    // fill ghost and stream
     fillGhostCells();
     streamInPlace<LatticeTag>(m_f, m_geom);
 
+    // compute macro 
     computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+
+    // writeout plot
+    writeOutput(step);
 
     m_time += amrex::Real(1.0);
 }
