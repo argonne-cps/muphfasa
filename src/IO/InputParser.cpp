@@ -75,14 +75,6 @@ std::string InputParser::collisionModel() const
     return val;
 }
 
-amrex::Real InputParser::tau() const
-{
-    amrex::ParmParse pp("lbm");
-    amrex::Real val = amrex::Real(1.0);
-    pp.query("tau", val);
-    return val;
-}
-
 amrex::Real InputParser::reynoldsNumber() const
 {
     amrex::ParmParse pp("units");

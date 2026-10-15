@@ -29,7 +29,6 @@
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
-#include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
 #include "IO/InputParser.H"
@@ -116,15 +115,24 @@ int main(int argc, char* argv[])
 {
     amrex::Initialize(argc, argv);
     {
-        amrex::ParmParse::addfile("inputs");
-
+        // Input file comes from the command line (e.g. `./test_couette
+        // inputs`), the same convention `muphfasa inputs` uses -- AMReX's
+        // own ParmParse setup inside amrex::Initialize() already reads
+        // argv[1], so no explicit ParmParse::addfile() call is needed here.
         InputParser params;
         std::unique_ptr<ISimulation> sim = makeSimulation(params);
         sim->initialize();
 
         const int Ny = params.ncells()[1];
-        const amrex::Real H   = amrex::Real(Ny);
-        const amrex::Real tau = params.tau();
+        const amrex::Real H = amrex::Real(Ny);
+
+        // tau/nu come from the simulation's own omega(), not an independent
+        // re-read of the input file: omega is derived from UnitConverter
+        // (refLength/refVelocity/refViscosity/N_ref), not a direct lbm.tau
+        // key, so asking the simulation for it directly is the only way to
+        // be sure this matches what the simulation is actually running
+        // with.
+        const amrex::Real tau = amrex::Real(1.0) / sim->omega();
         const amrex::Real nu  = (tau - amrex::Real(0.5)) * kCs2;
 
         // y-hi face, x-component (tangential velocity of the moving wall).

@@ -55,6 +55,7 @@ public:
     const amrex::MultiFab& vel() const noexcept override { return m_vel; }
 
     amrex::Real time() const noexcept override { return m_time; }
+    amrex::Real omega() const noexcept override { return m_omega; }
 
 private:
     // ── Input and unit conversion ─────────────────────────────────────────

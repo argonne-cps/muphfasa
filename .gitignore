@@ -1,4 +1,5 @@
 build/
+tmp_build_dir/
 .venv/
 tests/regression/*/*.csv
 tests/regression/*/*.png

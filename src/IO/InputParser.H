@@ -33,7 +33,9 @@ public:
     // ── LBM parameters ───────────────────────────────────────────────────
     std::string latticeType()    const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
     std::string collisionModel() const;  // "BGK" | "TRT" | "MRT"
-    amrex::Real tau()             const;  // relaxation time [lattice units]
+    // Relaxation time (tau) is derived from the physical reference scales
+    // via UnitConverter, not read directly -- see SimulationImpl's
+    // constructor and ISimulation::omega().
 
     // ── Physical / unit parameters ────────────────────────────────────────
     amrex::Real reynoldsNumber() const;

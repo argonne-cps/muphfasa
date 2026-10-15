@@ -40,8 +40,10 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
                                               params.refDensity(),
                                               max_N);
     
-    // Set collision param
-    m_omega = amrex::Real(1.0) / m_params.tau();
+    // Set collision param: omega = 1/tau, with tau derived from the
+    // physical reference scales via UnitConverter (not a direct lbm.tau
+    // input -- InputParser has no such accessor).
+    m_omega = amrex::Real(1.0) / m_units->relaxationTime<LatticeTag>();
 
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);

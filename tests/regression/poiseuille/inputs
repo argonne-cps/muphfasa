@@ -13,11 +13,16 @@ sim.stop_time    = -1.0      # run to max_step
 
 # ── LBM ────────────────────────────────────────────────────────────────────
 lbm.lattice_type = D2Q9
-lbm.tau          = 0.8       # relaxation time (nu = cs2*(tau-0.5))
 
 # ── Physical units ─────────────────────────────────────────────────────────
-units.Re         = 10.0
-units.Ma         = 0.05
+# tau (relaxation time) is derived from these via UnitConverter, not set
+# directly -- see SimulationImpl's constructor. With N_ref = max(grid.ncells)
+# = 32 and the default lattice velocity U_lat=0.1, this gives tau=0.8.
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.ref_viscosity = 0.03125  # = 1/32; gives tau=0.8 at N_ref=32
+units.Re            = 32.0     # = ref_velocity*ref_length/ref_viscosity
+units.Ma            = 0.05
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # x: periodic  (set automatically when ncells[0] > 1 and geom is periodic)

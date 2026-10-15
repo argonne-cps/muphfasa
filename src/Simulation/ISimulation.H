@@ -27,6 +27,14 @@ public:
     virtual const amrex::MultiFab& vel() const noexcept = 0;
 
     virtual amrex::Real time() const noexcept = 0;
+
+    // BGK relaxation parameter actually in use (omega = 1/tau), derived from
+    // UnitConverter::relaxationTime<LatticeTag>() -- see SimulationImpl's
+    // constructor. Exposed so callers (e.g. regression tests comparing
+    // against an analytic solution) can recover the lattice viscosity the
+    // simulation is actually running with instead of re-deriving it
+    // independently, which could silently drift from the real value.
+    virtual amrex::Real omega() const noexcept = 0;
 };
 
 } // namespace muphfasa
