@@ -22,7 +22,7 @@ public:
     InputParser();
 
     // ── Grid ─────────────────────────────────────────────────────────────
-    std::array<int, AMREX_SPACEDIM> ncells()       const;  // cells per direction
+    std::vector<int> ncells()       const;  // cells per direction
     int                              maxGridSize()  const;
     int                              nGhost()       const;  // ghost-cell layers
 
@@ -45,6 +45,8 @@ public:
 
     // ── Geometry ─────────────────────────────────────────────────────────
     std::string geometryType()   const;   // "box" | "sphere" | "stl" | …
+    std::vector<amrex::Real> geometryProbLo()   const;   // [m] AMREX_SPACEDIM entries
+    std::vector<amrex::Real> geometryProbHi()   const;   // [m] AMREX_SPACEDIM entries
     bool        useEB()          const;
 
     // ── Boundary conditions ───────────────────────────────────────────────
@@ -53,6 +55,7 @@ public:
     // Returned array order matches muphfasa::faceIndex(dir, bound) in
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;

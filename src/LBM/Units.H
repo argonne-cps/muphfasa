@@ -19,11 +19,13 @@ public:
     // nu_ref [m^2/s]   : kinematic viscosity
     // rho_ref [kg/m^3] : reference density
     // N_ref            : number of lattice cells spanning L_ref (resolution)
+    // U_lat [lu/lt]     : Lattice velocity in dimensionless lattice units (defaults to 0.1)
     UnitConverter(amrex::Real L_ref,
                   amrex::Real U_ref,
                   amrex::Real nu_ref,
                   amrex::Real rho_ref,
-                  int         N_ref);
+                  int         N_ref,
+                  amrex::Real U_lat=amrex::Real(0.1));
 
     // ── Physical → lattice ───────────────────────────────────────────────
     amrex::Real toLatticeLength   (amrex::Real x_phys)   const noexcept;
@@ -41,7 +43,9 @@ public:
 
     // ── Dimensionless parameters ─────────────────────────────────────────
     amrex::Real reynoldsNumber()    const noexcept;  // Re = U_ref * L_ref / nu_ref
-    amrex::Real machNumber()        const noexcept;  // Ma = U_lat / cs  (cs = 1/sqrt(3))
+    template <typename LatticeTag>
+    amrex::Real machNumber()        const noexcept;  // Ma = U_lat / cs  
+    template <typename LatticeTag>
     amrex::Real relaxationTime()    const noexcept;  // tau = nu_lat/cs2 + 0.5
 
     // ── Lattice spacings ────────────────────────────────────────────────

@@ -28,12 +28,19 @@ template <typename LatticeTag, typename CollisionModel>
 SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& params)
     : m_params(params)
 {
+    // get Ncells in largest direction
+    auto Ncells = params.ncells();
+    int max_N = Ncells[0];
+    for (auto n : Ncells) { max_N = n ? n > max_N : max_N; }
+
+    // Set phys/lattice units
     m_units = std::make_unique<UnitConverter>(params.refLength(),
                                               params.refVelocity(),
                                               params.refViscosity(),
                                               params.refDensity(),
-                                              params.ncells()[0]);
+                                              max_N);
 
+    // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
     if (params.useEB()) {
         m_geom_handler->initEB(params.geometryType());
@@ -44,12 +51,13 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     m_ba   = m_geom_handler->boxArray();
     m_dm   = m_geom_handler->distMap();
 
-    const int n_ghost = params.nGhost();
-    m_f.define  (m_ba, m_dm, LatticeTag::Q,  n_ghost);
-    m_feq.define(m_ba, m_dm, LatticeTag::Q,  n_ghost);
-    m_rho.define(m_ba, m_dm, 1,              n_ghost);
-    m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, n_ghost);
+    // init multifabs
+    m_f.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
+    m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
+    m_rho.define(m_ba, m_dm, 1,              0);
+    m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
 
+    // setup boundary conditions
     buildBCManager();
 }
 
@@ -121,6 +129,8 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
     const auto names = m_params.bcNames();
+    const auto rhoWall = m_params.refDensity();
+    const auto Uwall = m_params.Uwall();
 
     BCManager<LatticeTag> bc_manager{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -134,6 +144,13 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                 continue; // no lbmBCtype to set; FillBoundary handles it
             }
             bc_manager.setFaceBC(dir, bound, parselbmBCtype(name));
+            if (name == "MovingWall") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                if (bound == -1)
+                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir]);
+                else if (bound == 1)
+                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir+1]);
+            }
         }
     }
 

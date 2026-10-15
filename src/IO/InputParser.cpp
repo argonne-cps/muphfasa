@@ -18,15 +18,13 @@ InputParser::InputParser()
     // ParmParse reads from the file already loaded by AMReX::Initialize.
 }
 
-std::array<int, AMREX_SPACEDIM> InputParser::ncells() const
+std::vector<int> InputParser::ncells() const
 {
     amrex::ParmParse pp("grid");
     amrex::Vector<int> n(AMREX_SPACEDIM);
     pp.getarr("ncells", n, 0, AMREX_SPACEDIM);
 
-    std::array<int, AMREX_SPACEDIM> out{};
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) { out[d] = n[d]; }
-    return out;
+    return n;
 }
 
 int InputParser::maxGridSize() const
@@ -133,6 +131,26 @@ amrex::Real InputParser::refDensity() const
     return val;
 }
 
+std::vector<amrex::Real> InputParser::geometryProbLo() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_lo(AMREX_SPACEDIM);
+    pp.getarr("prob_lo", prob_lo, 0, AMREX_SPACEDIM);
+
+    return prob_lo;
+}
+
+std::vector<amrex::Real> InputParser::geometryProbHi() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_hi(AMREX_SPACEDIM);
+    pp.getarr("prob_hi", prob_hi, 0, AMREX_SPACEDIM);
+
+    return prob_hi;
+}
+
 std::string InputParser::geometryType() const
 {
     amrex::ParmParse pp("geometry");
@@ -173,6 +191,50 @@ std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
         names[2 * dir + 1] = hi[dir];
     }
     return names;
+}
+
+amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> InputParser::Uwall() const {
+    amrex::ParmParse pp("bc");
+
+    std::vector<amrex::Real> lox_Uwall, hix_Uwall,
+                             loy_Uwall, hiy_Uwall,
+                             loz_Uwall, hiz_Uwall;
+    
+    
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall{};
+
+    std::vector<std::string> param_Uwall = {"lox_Uwall", "hix_Uwall",
+                                            "loy_Uwall", "hiy_Uwall",
+                                            "loz_Uwall", "hiz_Uwall"};
+    // loop over each wall 
+    for (int dir=0; dir < 2 * AMREX_SPACEDIM; ++dir) {
+        std::vector<amrex::Real> curr_U{};
+        pp.queryarr(param_Uwall[dir], curr_U);
+        if (curr_U.empty()) continue; // wall velocity not specified for this face
+
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            static_cast<int>(curr_U.size()) == AMREX_SPACEDIM,
+            ("InputParser::Uwall: " + param_Uwall[dir] + " must list exactly "
+             "AMREX_SPACEDIM components").c_str());
+
+        // fill our Uwall array
+        const int normal_dim = dir / 2;
+        for (int dim=0; dim < AMREX_SPACEDIM; ++dim){
+            // don't set wall-direction velocity
+            if (dim != normal_dim) {
+                Uwall[dir][dim] = curr_U[dim];
+            } else {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    curr_U[dim] == 0.,
+                    ("InputParser::Uwall: " + param_Uwall[dir] + " has a nonzero "
+                     "component along the wall normal (component " + std::to_string(dim) +
+                     "), which implies an expanding/contracting wall. Only wall "
+                     "velocities tangential to the face are supported.").c_str());
+            }
+        }
+    }
+
+    return Uwall;
 }
 
 int InputParser::plotInterval() const
