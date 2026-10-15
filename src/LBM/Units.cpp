@@ -8,26 +8,19 @@
 
 namespace muphfasa {
 
-namespace {
-// Lattice reference velocity used to pin down dt given dx. Kept well below
-// the lattice sound speed (cs = 1/sqrt(3) ~ 0.577) to keep compressibility
-// error low while staying comfortably inside the BGK stability region; this
-// is a standard convention (see e.g. Kruger et al., "The Lattice Boltzmann
-// Method", Ch. 7, unit conversion).
-constexpr amrex::Real kLatticeVelocity = amrex::Real(0.1);
-constexpr amrex::Real kCs2             = amrex::Real(1.0) / amrex::Real(3.0);
-}
-
 UnitConverter::UnitConverter(amrex::Real L_ref,
                               amrex::Real U_ref,
                               amrex::Real nu_ref,
                               amrex::Real rho_ref,
-                              int         N_ref)
-    : m_L_ref(L_ref), m_U_ref(U_ref), m_nu_ref(nu_ref), m_rho_ref(rho_ref)
+                              int         N_ref,
+                              amrex::Real U_lat)
+    : m_L_ref(L_ref), m_U_ref(U_ref), m_nu_ref(nu_ref), m_rho_ref(rho_ref), m_u_lat(U_lat)
 {
+    // set conversion factors (length, time)
     m_dx     = m_L_ref / amrex::Real(N_ref);
-    m_u_lat  = kLatticeVelocity;
     m_dt     = m_u_lat * m_dx / m_U_ref;
+
+    // calc lattice viscosity
     m_nu_lat = m_nu_ref * m_dt / (m_dx * m_dx);
 }
 
@@ -48,14 +41,16 @@ amrex::Real UnitConverter::reynoldsNumber() const noexcept
     return m_U_ref * m_L_ref / m_nu_ref;
 }
 
+template <typename LatticeTag>
 amrex::Real UnitConverter::machNumber() const noexcept
 {
-    return m_u_lat * std::sqrt(amrex::Real(3.0));
+    return m_u_lat * std::sqrt(LatticeTag::cs2);
 }
 
+template <typename LatticeTag>
 amrex::Real UnitConverter::relaxationTime() const noexcept
 {
-    return m_nu_lat / kCs2 + amrex::Real(0.5);
+    return m_nu_lat / LatticeTag::cs2 + amrex::Real(0.5);
 }
 
 } // namespace muphfasa

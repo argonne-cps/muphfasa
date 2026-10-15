@@ -18,15 +18,13 @@ InputParser::InputParser()
     // ParmParse reads from the file already loaded by AMReX::Initialize.
 }
 
-std::array<int, AMREX_SPACEDIM> InputParser::ncells() const
+std::vector<int> InputParser::ncells() const
 {
     amrex::ParmParse pp("grid");
     amrex::Vector<int> n(AMREX_SPACEDIM);
     pp.getarr("ncells", n, 0, AMREX_SPACEDIM);
 
-    std::array<int, AMREX_SPACEDIM> out{};
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) { out[d] = n[d]; }
-    return out;
+    return n;
 }
 
 int InputParser::maxGridSize() const

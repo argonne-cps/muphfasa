@@ -22,7 +22,7 @@ public:
     InputParser();
 
     // ── Grid ─────────────────────────────────────────────────────────────
-    std::array<int, AMREX_SPACEDIM> ncells()       const;  // cells per direction
+    std::vector<int> ncells()       const;  // cells per direction
     int                              maxGridSize()  const;
     int                              nGhost()       const;  // ghost-cell layers
 
