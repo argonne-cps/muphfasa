@@ -133,6 +133,26 @@ amrex::Real InputParser::refDensity() const
     return val;
 }
 
+std::vector<amrex::Real> InputParser::geometryProbLo() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_lo(AMREX_SPACEDIM);
+    pp.getarr("prob_lo", prob_lo, 0, AMREX_SPACEDIM);
+
+    return prob_lo;
+}
+
+std::vector<amrex::Real> InputParser::geometryProbHi() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_hi(AMREX_SPACEDIM);
+    pp.getarr("prob_hi", prob_hi, 0, AMREX_SPACEDIM);
+
+    return prob_hi;
+}
+
 std::string InputParser::geometryType() const
 {
     amrex::ParmParse pp("geometry");

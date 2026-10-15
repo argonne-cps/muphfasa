@@ -7,13 +7,13 @@
 
 #include <AMReX_EB2.H>
 #include <AMReX_EBFabFactory.H>
-#include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
 namespace muphfasa {
 
 GeometryHandler::GeometryHandler(const InputParser& params)
 {
+    // create comp boundary
     const auto n_cells = params.ncells();
     amrex::IntVect dom_hi;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
@@ -21,17 +21,29 @@ GeometryHandler::GeometryHandler(const InputParser& params)
     }
     const amrex::Box domain(amrex::IntVect(0), dom_hi);
 
-    amrex::ParmParse pp("geometry");
+    // init physical boundary
+    std::vector<amrex::Real> prob_lo_in = params.geometryProbLo();
+    std::vector<amrex::Real> prob_hi_in = params.geometryProbHi();
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> prob_lo{};
+    amrex::Array<amrex::Real, AMREX_SPACEDIM> prob_hi{};
+    for (int dim=0; dim < AMREX_SPACEDIM; ++dim) {
+        prob_lo[dim] = prob_lo_in[dim];
+        prob_hi[dim] = prob_hi_in[dim];
+    }
 
-    amrex::Vector<amrex::Real> prob_lo(AMREX_SPACEDIM), prob_hi(AMREX_SPACEDIM);
-    pp.getarr("prob_lo", prob_lo, 0, AMREX_SPACEDIM);
-    pp.getarr("prob_hi", prob_hi, 0, AMREX_SPACEDIM);
-    const amrex::RealBox real_box(prob_lo.data(), prob_hi.data());
+    const amrex::RealBox real_box(prob_lo, prob_hi);
 
-    amrex::Vector<int> is_periodic_in(AMREX_SPACEDIM, 0);
-    pp.getarr("is_periodic", is_periodic_in, 0, AMREX_SPACEDIM);
+    // check for periodicity
     amrex::Array<int, AMREX_SPACEDIM> is_periodic{};
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) { is_periodic[d] = is_periodic_in[d]; }
+    auto const bc_names = params.bcNames();
+    for (int dim=0; dim < AMREX_SPACEDIM; ++dim){
+        if (bc_names[2*dim] == "Periodic"){
+            is_periodic[dim] = 1;
+        } else {
+            is_periodic[dim] = 0;
+        }
+        
+    }
 
     m_geom.define(domain, real_box, amrex::CoordSys::cartesian, is_periodic);
 }
