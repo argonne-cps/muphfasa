@@ -22,7 +22,7 @@ public:
     InputParser();
 
     // ── Grid ─────────────────────────────────────────────────────────────
-    std::array<int, AMREX_SPACEDIM> ncells()       const;  // cells per direction
+    std::vector<int> ncells()       const;  // cells per direction
     int                              maxGridSize()  const;
     int                              nGhost()       const;  // ghost-cell layers
 
@@ -45,11 +45,13 @@ public:
 
     // ── Geometry ─────────────────────────────────────────────────────────
     std::string geometryType()   const;   // "box" | "sphere" | "stl" | …
+    std::vector<amrex::Real> geometryProbLo()   const;   // [m] AMREX_SPACEDIM entries
+    std::vector<amrex::Real> geometryProbHi()   const;   // [m] AMREX_SPACEDIM entries
     bool        useEB()          const;
 
     // ── Boundary conditions ───────────────────────────────────────────────
-    // bc.lo = <x> [<y> [<z>]], bc.hi = <x> [<y> [<z>]], one name per
-    // direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
+    // bc.lo_type = <x> [<y> [<z>]], bc.hi_type = <x> [<y> [<z>]], one name
+    // per direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
     // Returned array order matches muphfasa::faceIndex(dir, bound) in
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;

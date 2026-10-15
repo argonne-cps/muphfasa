@@ -18,15 +18,13 @@ InputParser::InputParser()
     // ParmParse reads from the file already loaded by AMReX::Initialize.
 }
 
-std::array<int, AMREX_SPACEDIM> InputParser::ncells() const
+std::vector<int> InputParser::ncells() const
 {
     amrex::ParmParse pp("grid");
     amrex::Vector<int> n(AMREX_SPACEDIM);
     pp.getarr("ncells", n, 0, AMREX_SPACEDIM);
 
-    std::array<int, AMREX_SPACEDIM> out{};
-    for (int d = 0; d < AMREX_SPACEDIM; ++d) { out[d] = n[d]; }
-    return out;
+    return n;
 }
 
 int InputParser::maxGridSize() const
@@ -133,6 +131,26 @@ amrex::Real InputParser::refDensity() const
     return val;
 }
 
+std::vector<amrex::Real> InputParser::geometryProbLo() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_lo(AMREX_SPACEDIM);
+    pp.getarr("prob_lo", prob_lo, 0, AMREX_SPACEDIM);
+
+    return prob_lo;
+}
+
+std::vector<amrex::Real> InputParser::geometryProbHi() const
+{
+    amrex::ParmParse pp("geometry");
+
+    std::vector<amrex::Real> prob_hi(AMREX_SPACEDIM);
+    pp.getarr("prob_hi", prob_hi, 0, AMREX_SPACEDIM);
+
+    return prob_hi;
+}
+
 std::string InputParser::geometryType() const
 {
     amrex::ParmParse pp("geometry");
@@ -151,19 +169,19 @@ bool InputParser::useEB() const
 
 std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
 {
-    // bc.lo = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
-    // bc.hi = NoSlip Outflow Periodic
+    // bc.lo_type = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
+    // bc.hi_type = NoSlip Outflow Periodic
     amrex::ParmParse pp("bc");
 
     std::vector<std::string> lo, hi;
-    pp.getarr("lo", lo);
-    pp.getarr("hi", hi);
+    pp.getarr("lo_type", lo);
+    pp.getarr("hi_type", hi);
 
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
         static_cast<int>(lo.size()) == AMREX_SPACEDIM &&
         static_cast<int>(hi.size()) == AMREX_SPACEDIM,
-        "InputParser::bcNames: bc.lo and bc.hi must each list exactly "
-        "AMREX_SPACEDIM names (one per direction)");
+        "InputParser::bcNames: bc.lo_type and bc.hi_type must each list "
+        "exactly AMREX_SPACEDIM names (one per direction)");
 
     // Order matches muphfasa::faceIndex(dir, bound): [xlo, xhi, ylo, yhi,
     // zlo, zhi].

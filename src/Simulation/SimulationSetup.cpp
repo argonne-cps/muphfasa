@@ -28,9 +28,37 @@ template <typename LatticeTag, typename CollisionModel>
 SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& params)
     : m_params(params)
 {
-    // TODO: construct UnitConverter from params, then GeometryHandler,
-    //       then allocate MultiFabs (m_f/m_feq with LatticeTag::Q components),
-    //       then buildBCManager() (needs m_geom to already be set).
+    // get Ncells in largest direction
+    auto Ncells = params.ncells();
+    int max_N = Ncells[0];
+    for (auto n : Ncells) { max_N = n ? n > max_N : max_N; }
+
+    // Set phys/lattice units
+    m_units = std::make_unique<UnitConverter>(params.refLength(),
+                                              params.refVelocity(),
+                                              params.refViscosity(),
+                                              params.refDensity(),
+                                              max_N);
+
+    // Setup Geometry of Problem
+    m_geom_handler = std::make_unique<GeometryHandler>(params);
+    if (params.useEB()) {
+        m_geom_handler->initEB(params.geometryType());
+    }
+    m_geom_handler->buildBoxArray(params.maxGridSize());
+
+    m_geom = m_geom_handler->geometry();
+    m_ba   = m_geom_handler->boxArray();
+    m_dm   = m_geom_handler->distMap();
+
+    // init multifabs
+    m_f.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
+    m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
+    m_rho.define(m_ba, m_dm, 1,              0);
+    m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
+
+    // setup boundary conditions
+    buildBCManager();
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -39,9 +67,10 @@ SimulationImpl<LatticeTag, CollisionModel>::~SimulationImpl() = default;
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 {
-    // TODO: setInitialConditions(), fillGhostCells()
-    //       Optionally restart from a checkpoint if one exists.
-    amrex::Print() << "Simulation::initialize() -- stub\n";
+    // Restart support needs a restart-file key on InputParser, which doesn't
+    // exist yet; always start fresh for now.
+    setInitialConditions();
+    fillGhostCells();
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -82,7 +111,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
-    // TODO: fill m_f with the equilibrium for the prescribed initial rho and u
+    // Quiescent start: rho = 1 (lattice density unit), u = 0 everywhere.
+    // InputParser has no per-case IC parameters yet (e.g. lid velocity).
+    m_rho.setVal(amrex::Real(1.0));
+    m_vel.setVal(amrex::Real(0.0));
+    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
 }
 
 template <typename LatticeTag, typename CollisionModel>

@@ -28,6 +28,7 @@ struct LatticeDescriptor<2, 9>
     static constexpr int Q = 9;
     static constexpr amrex::Real cs2    = amrex::Real(1.0) / amrex::Real(3.0);
     static constexpr amrex::Real cs2inv = amrex::Real(3.0);
+    static constexpr int nGhost = 1;
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cx(int q) noexcept {
@@ -69,6 +70,7 @@ struct LatticeDescriptor<3, 15>
     static constexpr int Q = 15;
     static constexpr amrex::Real cs2    = amrex::Real(1.0) / amrex::Real(3.0);
     static constexpr amrex::Real cs2inv = amrex::Real(3.0);
+    static constexpr int nGhost = 1;
 
     // TODO: fill in D3Q15 velocity data
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -95,6 +97,7 @@ struct LatticeDescriptor<3, 19>
     static constexpr int Q = 19;
     static constexpr amrex::Real cs2    = amrex::Real(1.0) / amrex::Real(3.0);
     static constexpr amrex::Real cs2inv = amrex::Real(3.0);
+    static constexpr int nGhost = 1;
 
     // TODO: fill in D3Q19 velocity data
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
@@ -121,6 +124,7 @@ struct LatticeDescriptor<3, 27>
     static constexpr int Q = 27;
     static constexpr amrex::Real cs2    = amrex::Real(1.0) / amrex::Real(3.0);
     static constexpr amrex::Real cs2inv = amrex::Real(3.0);
+    static constexpr int nGhost = 1;
 
     // TODO: fill in D3Q27 velocity data
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
