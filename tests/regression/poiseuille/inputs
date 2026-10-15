@@ -22,8 +22,8 @@ units.Ma         = 0.05
 # ── Boundary conditions ────────────────────────────────────────────────────
 # x: periodic  (set automatically when ncells[0] > 1 and geom is periodic)
 # y: no-slip walls (bounce-back)
-bc.lo_type = periodic  noslip
-bc.hi_type = periodic  noslip
+bc.lo_type = Periodic  NoSlip
+bc.hi_type = Periodic  NoSlip
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 geometry.prob_lo    = 0.0  0.0

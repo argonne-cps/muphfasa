@@ -1,0 +1,39 @@
+# inputs.3d — Sample input file for a 3-D muphfasa simulation.
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells        = 64 32 32
+grid.max_grid_size = 32
+grid.n_ghost       = 1
+
+# ── Simulation ─────────────────────────────────────────────────────────────
+sim.max_step       = 5000
+sim.stop_time      = -1.0
+
+# ── LBM ────────────────────────────────────────────────────────────────────
+lbm.lattice_type   = D3Q19      # D3Q15 | D3Q19 | D3Q27
+lbm.tau            = 0.8
+
+# ── Physical / unit parameters ─────────────────────────────────────────────
+units.Re            = 100.0
+units.Ma            = 0.05
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.ref_viscosity = 0.01
+units.ref_density   = 1.0
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0  0.0
+geometry.prob_hi    = 2.0  1.0  1.0
+geometry.is_periodic = 1   0    1    # periodic in x and z, walls in y
+geometry.type       = box
+geometry.use_eb     = 0
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+bc.lo_type = Periodic  NoSlip  Periodic
+bc.hi_type = Periodic  NoSlip  Periodic
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 500
+amr.chk_int         = 2000
+amr.plot_file       = plt
+amr.check_file      = chk

@@ -21,8 +21,8 @@ units.Ma          = 0.05
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # All four walls are no-slip; top wall (y=H) moves at u_lid = Ma*cs.
-bc.lo_type = noslip  noslip
-bc.hi_type = noslip  moving_wall
+bc.lo_type = NoSlip  NoSlip
+bc.hi_type = NoSlip  moving_wall
 bc.hi_wall_velocity = 0.05  0.0   # (vx, vy) in lattice units
 
 # ── Geometry ───────────────────────────────────────────────────────────────
