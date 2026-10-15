@@ -175,6 +175,50 @@ std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
     return names;
 }
 
+amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> InputParser::Uwall() const {
+    amrex::ParmParse pp("bc");
+
+    std::vector<amrex::Real> lox_Uwall, hix_Uwall,
+                             loy_Uwall, hiy_Uwall,
+                             loz_Uwall, hiz_Uwall;
+    
+    
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall{};
+
+    std::vector<std::string> param_Uwall = {"lox_Uwall", "hix_Uwall",
+                                            "loy_Uwall", "hiy_Uwall",
+                                            "loz_Uwall", "hiz_Uwall"};
+    // loop over each wall 
+    for (int dir=0; dir < 2 * AMREX_SPACEDIM; ++dir) {
+        std::vector<amrex::Real> curr_U{};
+        pp.queryarr(param_Uwall[dir], curr_U);
+        if (curr_U.empty()) continue; // wall velocity not specified for this face
+
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            static_cast<int>(curr_U.size()) == AMREX_SPACEDIM,
+            ("InputParser::Uwall: " + param_Uwall[dir] + " must list exactly "
+             "AMREX_SPACEDIM components").c_str());
+
+        // fill our Uwall array
+        const int normal_dim = dir / 2;
+        for (int dim=0; dim < AMREX_SPACEDIM; ++dim){
+            // don't set wall-direction velocity
+            if (dim != normal_dim) {
+                Uwall[dir][dim] = curr_U[dim];
+            } else {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    curr_U[dim] == 0.,
+                    ("InputParser::Uwall: " + param_Uwall[dir] + " has a nonzero "
+                     "component along the wall normal (component " + std::to_string(dim) +
+                     "), which implies an expanding/contracting wall. Only wall "
+                     "velocities tangential to the face are supported.").c_str());
+            }
+        }
+    }
+
+    return Uwall;
+}
+
 int InputParser::plotInterval() const
 {
     amrex::ParmParse pp("amr");

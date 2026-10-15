@@ -99,6 +99,8 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
     const auto names = m_params.bcNames();
+    const auto rhoWall = m_params.refDensity();
+    const auto Uwall = m_params.Uwall();
 
     BCManager<LatticeTag> bc_manager{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
@@ -112,6 +114,13 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                 continue; // no lbmBCtype to set; FillBoundary handles it
             }
             bc_manager.setFaceBC(dir, bound, parselbmBCtype(name));
+            if (name == "MovingWall") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                if (bound == -1)
+                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir]);
+                else if (bound == 1)
+                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir+1]);
+            }
         }
     }
 
