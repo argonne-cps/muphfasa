@@ -1,88 +1,50 @@
-// BoundaryConditions.cpp — Implementations of LBM boundary condition types.
-// NoSlip uses full-way bounce-back; Inflow/Outflow use the Zou-He scheme.
-// Periodic BCs are handled entirely by AMReX FillBoundary and are no-ops here.
+// BoundaryConditions.cpp — Explicit instantiations for BCManager<LatticeTag>.
+//
+// BCManager is a header-only template (all of operator()/setFaceBC must be
+// visible to AMReX's GpuBndryFuncFab at the call site, and operator() must be
+// inlineable for GPU builds), so there is nothing to implement out-of-line
+// here. These instantiations exist purely to catch lattice-specific compile
+// errors early, mirroring the explicit-instantiation pattern used elsewhere
+// in src/LBM/.
 
 #include "BoundaryConditions.H"
 #include "LatticeDescriptor.H"
 
 namespace muphfasa {
 
-// ── BCManager ─────────────────────────────────────────────────────────────
-void BCManager::addBC(std::unique_ptr<BoundaryConditionBase> bc)
+lbmBCtype parselbmBCtype(const std::string& name)
 {
-    m_bcs.push_back(std::move(bc));
+    if (name == "NoSlip")  { return lbmBCtype::NoSlip;  }
+    if (name == "Inflow")  { return lbmBCtype::Inflow;  }
+    if (name == "Outflow") { return lbmBCtype::Outflow; }
+    amrex::Abort("parselbmBCtype: unrecognized BC name \"" + name +
+                 "\" (expected NoSlip, Inflow, or Outflow; Periodic faces "
+                 "must be filtered out before calling this)");
+    return lbmBCtype::NoSlip; // unreachable
 }
 
-void BCManager::applyAll(amrex::MultiFab&       f_mf,
-                         const amrex::Geometry& geom,
-                         int                    step) const
+amrex::Vector<amrex::BCRec> makeBCRecVector(
+    const std::array<std::string, 2 * AMREX_SPACEDIM>& names, int ncomp)
 {
-    for (const auto& bc : m_bcs) {
-        bc->apply(f_mf, geom, step);
+    amrex::BCRec bcr;
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        const std::string& lo_name = names[faceIndex(dir, -1)];
+        const std::string& hi_name = names[faceIndex(dir, 1)];
+
+        bcr.setLo(dir, (lo_name == "Periodic") ? amrex::BCType::int_dir
+                                                : kCustomBCSentinel);
+        bcr.setHi(dir, (hi_name == "Periodic") ? amrex::BCType::int_dir
+                                                : kCustomBCSentinel);
     }
+    return amrex::Vector<amrex::BCRec>(ncomp, bcr);
 }
 
-// ── NoSlipBC ──────────────────────────────────────────────────────────────
-template <typename LatticeTag>
-void NoSlipBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                  const amrex::Geometry& /*geom*/,
-                                  int /*step*/) const
-{
-    // TODO: bounce-back:  f_out[opposite[q]] = f_in[q]  at solid boundaries
-}
-
-// ── InflowBC ──────────────────────────────────────────────────────────────
-template <typename LatticeTag>
-InflowBC<LatticeTag>::InflowBC(amrex::Real rho_in,
-                                amrex::Array<amrex::Real, AMREX_SPACEDIM> u_in)
-    : m_rho(rho_in), m_u(u_in)
-{}
-
-template <typename LatticeTag>
-void InflowBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                  const amrex::Geometry& /*geom*/,
-                                  int /*step*/) const
-{
-    // TODO: Zou-He velocity boundary condition at inflow faces
-}
-
-// ── OutflowBC ─────────────────────────────────────────────────────────────
-template <typename LatticeTag>
-void OutflowBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                   const amrex::Geometry& /*geom*/,
-                                   int /*step*/) const
-{
-    // TODO: Zou-He pressure boundary / zero-gradient extrapolation at outflow
-}
-
-// ── PeriodicBC ────────────────────────────────────────────────────────────
-template <typename LatticeTag>
-void PeriodicBC<LatticeTag>::apply(amrex::MultiFab& /*f_mf*/,
-                                    const amrex::Geometry& /*geom*/,
-                                    int /*step*/) const
-{
-    // AMReX handles periodicity in FillBoundary; nothing to do here.
-}
-
-// ── Explicit instantiations ───────────────────────────────────────────────
-template class NoSlipBC<D2Q9>;
-template class NoSlipBC<D3Q15>;
-template class NoSlipBC<D3Q19>;
-template class NoSlipBC<D3Q27>;
-
-template class InflowBC<D2Q9>;
-template class InflowBC<D3Q15>;
-template class InflowBC<D3Q19>;
-template class InflowBC<D3Q27>;
-
-template class OutflowBC<D2Q9>;
-template class OutflowBC<D3Q15>;
-template class OutflowBC<D3Q19>;
-template class OutflowBC<D3Q27>;
-
-template class PeriodicBC<D2Q9>;
-template class PeriodicBC<D3Q15>;
-template class PeriodicBC<D3Q19>;
-template class PeriodicBC<D3Q27>;
+#if (AMREX_SPACEDIM == 2)
+template class BCManager<D2Q9>;
+#else
+template class BCManager<D3Q15>;
+template class BCManager<D3Q19>;
+template class BCManager<D3Q27>;
+#endif
 
 } // namespace muphfasa

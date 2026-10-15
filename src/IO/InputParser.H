@@ -31,8 +31,9 @@ public:
     amrex::Real stopTime()     const;  // physical end time (optional)
 
     // ── LBM parameters ───────────────────────────────────────────────────
-    std::string latticeType()  const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
-    amrex::Real tau()          const;  // BGK relaxation time [lattice units]
+    std::string latticeType()    const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
+    std::string collisionModel() const;  // "BGK" | "TRT" | "MRT"
+    amrex::Real tau()             const;  // relaxation time [lattice units]
 
     // ── Physical / unit parameters ────────────────────────────────────────
     amrex::Real reynoldsNumber() const;
@@ -45,6 +46,13 @@ public:
     // ── Geometry ─────────────────────────────────────────────────────────
     std::string geometryType()   const;   // "box" | "sphere" | "stl" | …
     bool        useEB()          const;
+
+    // ── Boundary conditions ───────────────────────────────────────────────
+    // bc.lo = <x> [<y> [<z>]], bc.hi = <x> [<y> [<z>]], one name per
+    // direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
+    // Returned array order matches muphfasa::faceIndex(dir, bound) in
+    // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
+    std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;

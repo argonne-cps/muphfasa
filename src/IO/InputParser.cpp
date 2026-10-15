@@ -5,8 +5,11 @@
 
 #include "InputParser.H"
 
+#include <AMReX_BLassert.H>
 #include <AMReX_ParmParse.H>
 #include <AMReX_Vector.H>
+
+#include <vector>
 
 namespace muphfasa {
 
@@ -63,6 +66,14 @@ std::string InputParser::latticeType() const
     amrex::ParmParse pp("lbm");
     std::string val = "D3Q19";
     pp.query("lattice_type", val);
+    return val;
+}
+
+std::string InputParser::collisionModel() const
+{
+    amrex::ParmParse pp("lbm");
+    std::string val = "BGK";
+    pp.query("collision_model", val);
     return val;
 }
 
@@ -136,6 +147,32 @@ bool InputParser::useEB() const
     int val = 0;
     pp.query("use_eb", val);
     return val != 0;
+}
+
+std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
+{
+    // bc.lo = NoSlip Inflow Periodic   (one name per direction: x [y [z]])
+    // bc.hi = NoSlip Outflow Periodic
+    amrex::ParmParse pp("bc");
+
+    std::vector<std::string> lo, hi;
+    pp.getarr("lo", lo);
+    pp.getarr("hi", hi);
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        static_cast<int>(lo.size()) == AMREX_SPACEDIM &&
+        static_cast<int>(hi.size()) == AMREX_SPACEDIM,
+        "InputParser::bcNames: bc.lo and bc.hi must each list exactly "
+        "AMREX_SPACEDIM names (one per direction)");
+
+    // Order matches muphfasa::faceIndex(dir, bound): [xlo, xhi, ylo, yhi,
+    // zlo, zhi].
+    std::array<std::string, 2 * AMREX_SPACEDIM> names{};
+    for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
+        names[2 * dir]     = lo[dir];
+        names[2 * dir + 1] = hi[dir];
+    }
+    return names;
 }
 
 int InputParser::plotInterval() const
