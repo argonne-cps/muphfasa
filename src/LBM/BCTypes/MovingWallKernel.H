@@ -15,7 +15,7 @@
 //     f(g, n) = f(x, opposite(n)) + wall_contrib(opposite(n))
 //
 // where, 
-//     wall_contrib(m) = -2 * rho_wall * weight(m) * c_i(m) * U_wall_i
+//     wall_contrib(m) = -2 * rho_wall * weight(m) * sum_i (c_i(m) * U_wall_i)
 // 
 // wall contribution depends on the **opposite** direction population and the
 // velocity and density at the wall. We only consider walls moving perpendicular
@@ -42,7 +42,7 @@ struct MovingWallKernel
                        amrex::Array4<amrex::Real> const& f,
                        int dir, int bound,
                        amrex::Real rho_wall,
-                       amrex::Real Uwall
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall
                        ) noexcept
     {
         for (int n = 0; n < LatticeTag::Q; ++n) {
@@ -50,29 +50,32 @@ struct MovingWallKernel
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
                     f(iv, n) = f(iv[0]-bound, iv[1], LatticeTag::opposite(n)) 
-                             + wallContrib(n, LatticTag::cx(n), rho_wall, Uwall);
+                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1]);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
                     f(iv, n) = f(iv[0], iv[1]-bound, LatticeTag::opposite(n))
-                             + wallContrib(n, LatticTag::cy(n), rho_wall, Uwall);
+                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0]);
                 }
             }
 #else
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
                     f(iv, n) = f(iv[0]-bound, iv[1], iv[2], LatticeTag::opposite(n))
-                             + wallContrib(n, LatticTag::cx(n), rho_wall, Uwall);
+                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1])
+                             + wallContrib(n, LatticeTag::cz(n), rho_wall, Uwall[2]);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
                     f(iv, n) = f(iv[0], iv[1]-bound, iv[2], LatticeTag::opposite(n))
-                             + wallContrib(n, LatticTag::cy(n), rho_wall, Uwall);
+                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0])
+                             + wallContrib(n, LatticeTag::cz(n), rho_wall, Uwall[2]);
                 }
             } else if (dir == 2) {
                 if (LatticeTag::cz(n) == -bound) {
                     f(iv, n) = f(iv[0], iv[1], iv[2]-bound, LatticeTag::opposite(n))
-                             + wallContrib(n, LatticTag::cz(n), rho_wall, Uwall);
+                             + wallContrib(n, LatticeTag::cx(n), rho_wall, Uwall[0])
+                             + wallContrib(n, LatticeTag::cy(n), rho_wall, Uwall[1]);
                 }
             }
 #endif
@@ -81,9 +84,11 @@ struct MovingWallKernel
 
     private:
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    amrex::Real wallContrib(int n, amrex::Real c_dir, amrex::Real rho_wall, amrex:Real u) {
-        return -2.0_rt * rho_wall * LatticeTag::weights(n) * c_dir * u;
+    static amrex::Real wallContrib(int n, int c_dir, amrex::Real rho_wall, amrex::Real u) {
+        return -2. * rho_wall * LatticeTag::weights(n) * c_dir * u;
     }
 };
 
 }
+
+#endif //MUPHFASA_MOVINGWALL_KERNEL_H 

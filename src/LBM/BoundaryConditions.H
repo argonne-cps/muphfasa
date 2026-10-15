@@ -11,7 +11,7 @@
 #ifndef MUPHFASA_BOUNDARY_CONDITIONS_H
 #define MUPHFASA_BOUNDARY_CONDITIONS_H
 
-#include "BCTypes/MovingWall.H"
+#include "BCTypes/MovingWallKernel.H"
 #include "BCTypes/NoSlipKernel.H"
 #include "BCTypes/InflowKernel.H"
 #include "BCTypes/OutflowKernel.H"
@@ -133,14 +133,14 @@ public:
         m_face_rho_wall[faceIndex(dir, bound)] = rho;
     }
 
-    void setFaceUwall(int dir, int bound, amrex::Real Uwall) {
+    void setFaceUwall(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
         m_face_Uwall[faceIndex(dir, bound)] = Uwall;
     }
 
 private:
     amrex::GpuArray<lbmBCtype, 2 * AMREX_SPACEDIM> m_face_bc{};
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_rho_wall{};
-    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_Uwall{};
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_Uwall{};
 };
 
 // Face name -> our own dispatch enum. 

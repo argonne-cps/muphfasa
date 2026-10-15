@@ -131,18 +131,34 @@ std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
     return names;
 }
 
-amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> Uwall() {
+amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> InputParser::Uwall() const {
     amrex::ParmParse pp("bc");
 
-    std::vector<amrex::Real> lo_Uwall, hi_Uwall;
-    pp.getarr("lo_Uwall", lo_Uwall);
-    pp.getarr("hi_Uwall", hi_Uwall);
+    std::vector<amrex::Real> lox_Uwall, hix_Uwall,
+                             loy_Uwall, hiy_Uwall,
+                             loz_Uwall, hiz_Uwall;
+    
+    
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall{};
 
-    amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> Uwall{};
+    std::vector<std::string> param_Uwall = {"lox_Uwall", "hix_Uwall",
+                                            "loy_Uwall", "hiy_Uwall",
+                                            "loz_Uwall", "hiz_Uwall"};
+    // loop over each wall 
+    for (int dir=0; dir < 2 * AMREX_SPACEDIM; ++dir) {
+        std::vector<amrex::Real> curr_U{};
+        pp.queryarr(param_Uwall[dir], curr_U);
 
-    for (int dir=0; dir < AMREX_SPACEDIM; ++dir) {
-        Uwall[2*dir] =  lo_Uwall[dir];
-        Uwall[2*dir + 1] =  hi_Uwall[dir];
+        // fill our Uwall array
+        for (int dim; dim < AMREX_SPACEDIM; ++dim){
+            // don't set wall-direction velocity
+            if (dir != dim) 
+                Uwall[dir][dim] = curr_U[dim];
+            else
+                if (curr_U[dim] != 0.)
+                    amrex::Print() << "Velocity on wall of direction=" << dir << "was set. This implies an expanding/contracting wall. This input will be ignored.";
+
+        }
     }
 
     return Uwall;

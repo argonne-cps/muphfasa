@@ -1,4 +1,5 @@
-// NoSlipKernel.H — Halfway bounce-back, ghost-fill form.
+// NoSlipKernel.H — Halfway bounce-back, ghost-fill form. 
+// Special case of MovingWall
 //
 //
 // The wall sits halfway between the last fluid node x and the first ghost
@@ -25,7 +26,7 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
-#include "MovingWall.H"
+#include "MovingWallKernel.H"
 
 namespace muphfasa {
 
@@ -40,7 +41,10 @@ struct NoSlipKernel
                        int dir, int bound) noexcept
     {
     
-        MovingWallKernel::apply(iv, f, dir, bound, 1.0_rt, AMREX_D_DECL{0.0_rt, 0.0_rt, 0.0_rt});
+        amrex::Real dummy_rho=1;
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> dummy_Uwall={AMREX_D_DECL(0., 0., 0.)};
+
+        MovingWallKernel<LatticeTag>::apply(iv, f, dir, bound, dummy_rho, dummy_Uwall);
     }
 };
 
