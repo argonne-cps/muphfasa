@@ -39,7 +39,7 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // given, and falls back to its own default u_lat if neither is.
     m_units = std::make_unique<UnitConverter>(params.refLength(),
                                               params.refVelocity(),
-                                              params.refViscosity(),
+                                              params.reynoldsNumber(),
                                               params.refDensity(),
                                               max_N,
                                               LatticeTag::cs2,
@@ -139,8 +139,15 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
     const auto names = m_params.bcNames();
-    const auto rhoWall = m_params.refDensity();
-    const auto Uwall = m_params.Uwall();
+
+    // wall params in lattice units
+    const auto rhoWall = m_units->toLatticeDensity(m_params.refDensity());
+    auto Uwall = m_params.Uwall();
+    for (auto wall : Uwall) {
+        for (auto u : wall) {
+            u = m_units->toLatticeVelocity(u);
+        }
+    }
 
     BCManager<LatticeTag> bc_manager{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {

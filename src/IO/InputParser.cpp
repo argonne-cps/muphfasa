@@ -123,13 +123,6 @@ amrex::Real InputParser::refVelocity() const
     return val;
 }
 
-amrex::Real InputParser::refViscosity() const
-{
-    amrex::ParmParse pp("units");
-    amrex::Real val = amrex::Real(1.0e-6);
-    pp.query("ref_viscosity", val);
-    return val;
-}
 
 amrex::Real InputParser::refDensity() const
 {

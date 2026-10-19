@@ -50,7 +50,6 @@ public:
     amrex::Real machNumber()     const;
     amrex::Real refLength()      const;   // [m]
     amrex::Real refVelocity()    const;   // [m/s]
-    amrex::Real refViscosity()   const;   // [m^2/s]
     amrex::Real refDensity()     const;   // [kg/m^3]
 
     // ── Geometry ─────────────────────────────────────────────────────────

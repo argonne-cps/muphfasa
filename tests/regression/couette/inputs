@@ -35,17 +35,15 @@ lbm.lattice_type = D2Q9
 #   nu_lat = ref_viscosity*dt/dx^2 = 0.1 [lattice units]
 #   tau = nu_lat/cs2 + 0.5 = 0.8
 units.ref_length    = 1.0
-units.ref_velocity  = 1.0
-units.ref_viscosity = 0.03125  # = 1/32; gives tau=0.8 at N_ref=32
-units.Re            = 32.0     # = ref_velocity*ref_length/ref_viscosity
-units.Ma            = 0.05
+units.ref_velocity  = 1.0 # match wall velocity
+units.Re            = 32.0 # implies nu = 1/32
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # x: periodic
 # y: NoSlip at y=lo, MovingWall at y=hi with wall velocity (U0, 0)
 bc.lo_type = Periodic  NoSlip
 bc.hi_type = Periodic  MovingWall
-bc.hiy_Uwall = 0.05  0.0   # (vx, vy) in lattice units -- vx is U0
+bc.hiy_Uwall = 1.  0.0   # (vx, vy) in physical units
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 # is_periodic is derived from bc.lo_type/bc.hi_type (GeometryHandler), not
