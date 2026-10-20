@@ -85,10 +85,21 @@ private:
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
 
+    // ── Per-stage wall-clock timers ───────────────────────────────────────
+    // Accumulated in advance() over the steps since the last timing report,
+    // then averaged/printed and reset in writeOutput(). mutable because
+    // writeOutput() is const but still needs to reset these after reporting.
+    mutable amrex::Real m_t_collide = amrex::Real(0.0);
+    mutable amrex::Real m_t_ghost   = amrex::Real(0.0);
+    mutable amrex::Real m_t_stream  = amrex::Real(0.0);
+    mutable amrex::Real m_t_macro   = amrex::Real(0.0);
+    mutable int         m_steps_since_report = 0;
+
     // ── Private helpers ───────────────────────────────────────────────────
     void setInitialConditions();
     void fillGhostCells();
     void buildBCManager();
+    void reportStageTiming(int step) const;
 };
 
 } // namespace muphfasa

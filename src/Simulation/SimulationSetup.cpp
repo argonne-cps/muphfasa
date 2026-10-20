@@ -22,7 +22,9 @@
 
 #include <AMReX_BLProfiler.H>
 #include <AMReX_GpuDevice.H>
+#include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
+#include <AMReX_Utility.H>
 
 namespace muphfasa {
 
@@ -92,15 +94,27 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     amrex::ignore_unused(step);
 
     // collide
+    amrex::Real t0 = amrex::second();
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
     collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_omega);
+    amrex::Real t1 = amrex::second();
+    m_t_collide += t1 - t0;
 
     // fill ghost and stream
     fillGhostCells();
+    amrex::Real t2 = amrex::second();
+    m_t_ghost += t2 - t1;
+
     streamInPlace<LatticeTag>(m_f, m_geom);
+    amrex::Real t3 = amrex::second();
+    m_t_stream += t3 - t2;
 
     // compute macro
     computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+    amrex::Real t4 = amrex::second();
+    m_t_macro += t4 - t3;
+
+    ++m_steps_since_report;
 
     m_time += amrex::Real(1.0);
 }
@@ -113,12 +127,43 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
     if (step % m_params.plotInterval() == 0) {
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         writeMacroPlotfile(fname, m_rho, m_vel, m_geom, m_time, step);
+        reportStageTiming(step);
     }
 
     if (step % m_params.checkpointInterval() == 0) {
         const std::string cname = checkpointName(m_params.checkpointPrefix(), step);
         writeCheckpoint(cname, m_f, m_geom, step, m_time);
     }
+}
+
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::reportStageTiming(int step) const
+{
+    // Report average per-step stage timing since the last report, then
+    // reset so the next report covers only the steps since this one.
+    if (m_steps_since_report == 0) { return; }
+
+    amrex::Real t_collide = m_t_collide;
+    amrex::Real t_ghost   = m_t_ghost;
+    amrex::Real t_stream  = m_t_stream;
+    amrex::Real t_macro   = m_t_macro;
+    amrex::ParallelDescriptor::ReduceRealMax({t_collide, t_ghost, t_stream, t_macro});
+
+    const amrex::Real n = amrex::Real(m_steps_since_report);
+    amrex::Print() << "[step " << step << "] avg stage time over "
+                    << m_steps_since_report << " step(s): "
+                    << "collide=" << (t_collide / n) * 1e3 << " ms, "
+                    << "ghost=" << (t_ghost / n) * 1e3 << " ms, "
+                    << "stream=" << (t_stream / n) * 1e3 << " ms, "
+                    << "macro=" << (t_macro / n) * 1e3 << " ms, "
+                    << "total=" << ((t_collide + t_ghost + t_stream + t_macro) / n) * 1e3
+                    << " ms\n";
+
+    m_t_collide = amrex::Real(0.0);
+    m_t_ghost   = amrex::Real(0.0);
+    m_t_stream  = amrex::Real(0.0);
+    m_t_macro   = amrex::Real(0.0);
+    m_steps_since_report = 0;
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -142,9 +187,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
     // fill physical bounds via BCManager<LatticeTag> (see buildBCManager())
     (*m_phys_bc)(m_f, 0, m_f.nComp(), m_f.nGrowVect(), m_time, 0);
 
-    // FillBoundary/PhysBCFunct only enqueue GPU work; sync once here so that
-    // this function's BL_PROFILE time reflects actual execution rather than
-    // launch overhead, without forcing a sync inside any per-box kernel.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 

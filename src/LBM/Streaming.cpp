@@ -61,8 +61,7 @@ void stream(const amrex::MultiFab& f_in,
         default_stream<LatticeTag>(tileBox, fi_arr, fo_arr);
     }
 
-    // One sync after the full per-box loop (see Collision.cpp::collideMF for
-    // why not per-box) so this region's profiled time is actual GPU time.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 
@@ -78,8 +77,7 @@ void streamInPlace(amrex::MultiFab&       f,
     stream<LatticeTag>(f, f_scratch, geom);
     amrex::MultiFab::Copy(f, f_scratch, 0, 0, f.nComp(), 0);
 
-    // stream() already synced its own GPU work above; this second sync
-    // covers the Copy's kernel launch so streamInPlace()'s own time is accurate.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 

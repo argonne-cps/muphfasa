@@ -56,9 +56,7 @@ void collideMF(amrex::MultiFab&       f_mf,
         CollisionModel::template collideArr<LatticeTag>(tileBox, f_arr, feq_arr, omega);
     }
 
-    // One sync after all per-box kernels are enqueued, so collideMF()'s
-    // profiled time reflects actual GPU execution. Not synced per-box:
-    // that would serialize kernel launches across boxes for no benefit.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 
@@ -116,7 +114,7 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
         collideFullArr<LatticeTag, CollisionModel>(tileBox, fstar_arr, f_arr, omega);
     }
 
-    // See collideMF() above: one sync after the full per-box loop, not per-box.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 

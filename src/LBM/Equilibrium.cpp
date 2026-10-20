@@ -62,8 +62,7 @@ void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
         computeEquilibrium<LatticeTag>(tileBox, rho, vel, feq_arr);
     }
 
-    // One sync after the full per-box loop (see Collision.cpp::collideMF for
-    // why not per-box) so this region's profiled time is actual GPU time.
+    // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
 
