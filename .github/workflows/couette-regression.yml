@@ -1,0 +1,97 @@
+name: Couette regression
+
+# Builds the plane-Couette regression test and checks:
+#   1. convergence.py: grid-convergence order of accuracy (vx vs. analytic)
+#   2. plot_couette.py: startup-transient profile error and n=1 Fourier
+#      mode decay rate vs. the analytic pi^2*nu/H^2 rate
+# See tests/regression/couette/README.md for what each script does.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/regression/couette/**'
+      - 'external/amrex'
+      - '.github/workflows/couette-regression.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/regression/couette/**'
+      - 'external/amrex'
+      - '.github/workflows/couette-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  couette:
+    name: Convergence + decay-rate check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository (with AMReX submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: pip install numpy matplotlib
+
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Resolve AMReX submodule commit (cache key)
+        id: amrex
+        run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # AMReX itself rarely changes; caching its compiled objects via ccache
+      # is what keeps this job fast after the first run on a given submodule
+      # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: couette-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
+          restore-keys: |
+            couette-ccache-${{ runner.os }}-amrex-
+
+      - name: Configure ccache
+        run: |
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
+      - name: Build test_couette (2-D)
+        working-directory: tests/regression/couette
+        run: make -j"$(nproc)"
+
+      - name: Grid-convergence study
+        working-directory: tests/regression/couette
+        # Observed order is ~3.0 locally (see README for why); --min-order
+        # leaves margin for compiler/platform noise while still catching a
+        # real regression (e.g. a dropped-to-1st-order BC bug).
+        run: python3 convergence.py --ny-list 16 32 64 --min-order 2.5
+
+      - name: Startup-transient profile + decay-rate check
+        working-directory: tests/regression/couette
+        # Observed values locally are ~3e-3 and ~5e-4 respectively; these
+        # thresholds leave an order of magnitude of margin.
+        run: python3 plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01
+
+      - name: Upload plots and data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: couette-regression-results
+          path: |
+            tests/regression/couette/couette_convergence.png
+            tests/regression/couette/couette_convergence.csv
+            tests/regression/couette/couette_decay.png
+          if-no-files-found: ignore

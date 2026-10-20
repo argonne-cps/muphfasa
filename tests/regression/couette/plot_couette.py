@@ -150,6 +150,12 @@ def main() -> int:
                          help="reuse an existing --run-dir instead of rerunning the solver")
     parser.add_argument("--out", type=Path, default=COUETTE_DIR / "couette_decay.png",
                          help="where to write the plot (default: ./couette_decay.png)")
+    parser.add_argument("--max-profile-err", type=float, default=None,
+                         help="if set, exit non-zero when max|u_sim-u_analytic|/U0 "
+                              "across all snapshots exceeds this")
+    parser.add_argument("--max-rate-rel-err", type=float, default=None,
+                         help="if set, exit non-zero when the fitted decay rate's "
+                              "relative error against pi^2*nu/H^2 exceeds this")
     args = parser.parse_args()
 
     solver_exe = find_one("test_couette*.ex", COUETTE_DIR)
@@ -207,6 +213,15 @@ def main() -> int:
         profiles.append((y_norm, u_sim, u_analytic))
 
     times = np.array(times)
+    # Skip the very first snapshot: right after the impulsive start, the
+    # analytic Fourier series is still resolving a near step-function profile
+    # and converges slowly there (Gibbs-like), which dwarfs any real solver
+    # error and isn't indicative of solver accuracy.
+    profile_max_err = max(
+        (float(np.max(np.abs(u_sim - u_analytic)))
+         for _, u_sim, u_analytic in (profiles[1:] or profiles)),
+        default=0.0,
+    ) / U0
 
     import matplotlib
     matplotlib.use("Agg")
@@ -272,7 +287,28 @@ def main() -> int:
     fig.tight_layout()
     fig.savefig(args.out, dpi=150)
     print(f"Wrote {args.out}")
-    return 0
+
+    print(f"max|u_sim-u_analytic|/U0 over all snapshots: {profile_max_err:.3e}")
+    if len(fit_idx) >= 2:
+        rate_rel_err = abs(slope - analytic_rate) / abs(analytic_rate)
+        print(f"decay rate relative error vs analytic: {rate_rel_err:.3e}")
+    else:
+        rate_rel_err = None
+
+    ok = True
+    if args.max_profile_err is not None and profile_max_err > args.max_profile_err:
+        print(f"FAIL: profile error {profile_max_err:.3e} > --max-profile-err {args.max_profile_err}")
+        ok = False
+    if args.max_rate_rel_err is not None:
+        if rate_rel_err is None:
+            print("FAIL: --max-rate-rel-err given but too few points to fit a decay rate")
+            ok = False
+        elif rate_rel_err > args.max_rate_rel_err:
+            print(f"FAIL: decay rate relative error {rate_rel_err:.3e} > "
+                  f"--max-rate-rel-err {args.max_rate_rel_err}")
+            ok = False
+
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

@@ -12,14 +12,16 @@ resolutions.
 Each run writes a matching plt<step>/analytic_plt<step> pair (already done
 by test_couette.cpp); this script diffs that pair with AMReX's fcompare
 tool and fits the observed order of accuracy from the inf-norm error on vx
-and vy across consecutive doublings of Ny.
+across consecutive doublings of Ny. (vy is identically zero for plane
+Couette flow, so its fcompare "error" is pure round-off with no real
+convergence behavior to track.)
 
 Usage:
     cd tests/regression/couette
     make                       # build test_couette2d.gnu.ex, if not already
     python3 convergence.py     # builds fcompare itself, then runs the study
 
-Requires only the Python standard library.
+Requires only the Python standard library (except for plotting via matplotlib).
 """
 
 import argparse
@@ -138,9 +140,9 @@ def run_one(ny: int, nx: int, tau: float, target_time: float,
     errors = parse_fcompare(result.stdout)
     (work_dir / "fcompare.log").write_text(result.stdout)
 
-    if "vx" not in errors or "vy" not in errors:
+    if "vx" not in errors:
         raise RuntimeError(
-            f"fcompare output for Ny={ny} did not contain vx/vy rows; "
+            f"fcompare output for Ny={ny} did not contain a vx row; "
             f"see {work_dir / 'fcompare.log'}"
         )
 
@@ -150,27 +152,21 @@ def run_one(ny: int, nx: int, tau: float, target_time: float,
         "target_step": target_step,
         "abs_err_vx": errors["vx"][0],
         "rel_err_vx": errors["vx"][1],
-        "abs_err_vy": errors["vy"][0],
-        "rel_err_vy": errors["vy"][1],
     }
 
 
 def observed_order(rows: list) -> list:
-    """Append order-of-accuracy estimates between consecutive rows, assuming
-    each Ny is double the previous one."""
+    """Append an order-of-accuracy estimate between consecutive rows,
+    assuming each Ny is double the previous one."""
     for i, row in enumerate(rows):
         if i == 0:
-            row["order_vx"] = row["order_vy"] = None
+            row["order_vx"] = None
             continue
         prev = rows[i - 1]
         ratio = row["Ny"] / prev["Ny"]
         row["order_vx"] = (
             math.log(prev["abs_err_vx"] / row["abs_err_vx"]) / math.log(ratio)
             if row["abs_err_vx"] > 0 and prev["abs_err_vx"] > 0 else None
-        )
-        row["order_vy"] = (
-            math.log(prev["abs_err_vy"] / row["abs_err_vy"]) / math.log(ratio)
-            if row["abs_err_vy"] > 0 and prev["abs_err_vy"] > 0 else None
         )
     return rows
 
@@ -233,14 +229,13 @@ def main() -> int:
 
     observed_order(rows)
 
-    header = f"{'Ny':>6}{'dx':>12}{'step':>8}{'abs_err_vx':>14}{'order_vx':>10}{'abs_err_vy':>14}{'order_vy':>10}"
+    header = f"{'Ny':>6}{'dx':>12}{'step':>8}{'abs_err_vx':>14}{'order_vx':>10}"
     print("\n" + header)
     print("-" * len(header))
     for row in rows:
         ox = f"{row['order_vx']:.2f}" if row["order_vx"] is not None else "   -"
-        oy = f"{row['order_vy']:.2f}" if row["order_vy"] is not None else "   -"
         print(f"{row['Ny']:>6}{row['dx']:>12.5f}{row['target_step']:>8}"
-              f"{row['abs_err_vx']:>14.6e}{ox:>10}{row['abs_err_vy']:>14.6e}{oy:>10}")
+              f"{row['abs_err_vx']:>14.6e}{ox:>10}")
 
     with open(args.csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
@@ -252,9 +247,7 @@ def main() -> int:
         plot_convergence(rows, args.plot)
 
     if args.min_order is not None:
-        worst = min(
-            o for row in rows for o in (row["order_vx"], row["order_vy"]) if o is not None
-        )
+        worst = min(row["order_vx"] for row in rows if row["order_vx"] is not None)
         if worst < args.min_order:
             print(f"FAIL: worst observed order {worst:.2f} < --min-order {args.min_order}")
             return 1

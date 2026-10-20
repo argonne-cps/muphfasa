@@ -40,7 +40,12 @@ The solver runs in its own `profile_run/` subdirectory (log in `run.log`).
 Output is written to `couette_decay.png`. Useful flags: `--inputs <path>`,
 `--override sim.max_step=8000 ...` (extra ParmParse overrides), `--no-run`
 (re-plot from an existing `profile_run/` without rerunning the solver),
-`--out <path>`.
+`--out <path>`, `--max-profile-err <tol>` / `--max-rate-rel-err <tol>` (exit
+non-zero if the max `|u_sim-u_analytic|/U0` across snapshots, or the fitted
+decay rate's relative error against `pi^2*nu/H^2`, exceeds the given
+tolerance -- used in CI; the very first snapshot right after the impulsive
+start is excluded from the profile-error check since the analytic Fourier
+series is still resolving a near step-function there).
 
 ## Convergence study
 
@@ -65,10 +70,25 @@ python3 convergence.py     # builds fcompare (DIM=2) on first run, then runs the
 Each resolution runs in its own `convergence_runs/Ny<N>/` subdirectory
 (solver log in `run.log`, `fcompare` output in `fcompare.log`). Results are
 printed as a table and written to `couette_convergence.csv`
-(`Ny, dx, target_step, abs_err_vx, order_vx, abs_err_vy, order_vy`), plus a
-log-log plot of `abs_err_vx` vs. `dx` against a reference 2nd-order line in
+(`Ny, dx, target_step, abs_err_vx, order_vx`), plus a log-log plot of
+`abs_err_vx` vs. `dx` against a reference 2nd-order line in
 `couette_convergence.png` (requires `matplotlib`; skip with `--no-plot`).
 
 Useful flags: `--ny-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`,
 `--min-order 1.8` (exit non-zero if the worst observed order falls below
 this), `--plot <path>`, `--no-plot`.
+
+`vy` is identically zero for this flow, so its `fcompare` "error" is pure
+round-off noise (~1e-15) with no real convergence behavior -- this script
+only tracks `vx`.
+
+## CI
+
+`.github/workflows/couette-regression.yml` builds `test_couette2d.gnu.ex`
+and runs both scripts on every push/PR touching `src/`,
+`tests/regression/couette/`, or the AMReX submodule:
+`convergence.py --min-order 2.5` and
+`plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01` (both
+thresholds leave roughly an order of magnitude of margin over the values
+observed locally). Plots and the convergence CSV are uploaded as workflow
+artifacts regardless of pass/fail.
