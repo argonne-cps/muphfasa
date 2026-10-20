@@ -3,6 +3,7 @@
 // main time-advance loop, and finalises AMReX before exit.
 
 #include <AMReX.H>
+#include <AMReX_BLProfiler.H>
 
 #include "IO/InputParser.H"
 #include "Simulation/ISimulation.H"
@@ -14,6 +15,8 @@ int main(int argc, char* argv[])
 {
     amrex::Initialize(argc, argv);
     {
+        BL_PROFILE("main()");
+
         muphfasa::InputParser params;
         std::unique_ptr<muphfasa::ISimulation> sim = muphfasa::makeSimulation(params);
 

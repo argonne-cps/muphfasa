@@ -82,6 +82,10 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
         computeDensity<LatticeTag>(tileBox, f_arr, rho);
         computeVelocity<LatticeTag>(tileBox, f_arr, rho, vel);
     }
+
+    // One sync after the full per-box loop (see Collision.cpp::collideMF for
+    // why not per-box) so this region's profiled time is actual GPU time.
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────

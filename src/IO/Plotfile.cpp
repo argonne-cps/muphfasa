@@ -4,6 +4,7 @@
 
 #include "Plotfile.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_PlotFileUtil.H>
 #include <AMReX_Print.H>
 
@@ -19,6 +20,8 @@ void writePlotfile(const std::string&                          file_name,
                    amrex::Real                                 time,
                    int                                         step)
 {
+    BL_PROFILE("writePlotfile()");
+
     if (mfs.empty()) {
         amrex::Print() << "Plotfile: nothing to write for " << file_name << "\n";
         return;
@@ -51,6 +54,8 @@ void writeMacroPlotfile(const std::string&     file_name,
                         amrex::Real            time,
                         int                    step)
 {
+    BL_PROFILE("writeMacroPlotfile()");
+
     amrex::Vector<std::string> names = {"density"};
 #if   (AMREX_SPACEDIM == 2)
     names.push_back("vx"); names.push_back("vy");

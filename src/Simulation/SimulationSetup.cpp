@@ -20,6 +20,8 @@
 #include "LBM/Streaming.H"
 #include "LBM/Units.H"
 
+#include <AMReX_BLProfiler.H>
+#include <AMReX_GpuDevice.H>
 #include <AMReX_Print.H>
 
 namespace muphfasa {
@@ -85,6 +87,8 @@ void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 {
+    BL_PROFILE("SimulationImpl::advance()");
+
     amrex::ignore_unused(step);
 
     // collide
@@ -104,6 +108,8 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 {
+    BL_PROFILE("SimulationImpl::writeOutput()");
+
     if (step % m_params.plotInterval() == 0) {
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         writeMacroPlotfile(fname, m_rho, m_vel, m_geom, m_time, step);
@@ -128,11 +134,18 @@ void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
 {
+    BL_PROFILE("SimulationImpl::fillGhostCells()");
+
     // fill internal bounds/periodic
     m_f.FillBoundary(m_geom.periodicity());
 
     // fill physical bounds via BCManager<LatticeTag> (see buildBCManager())
     (*m_phys_bc)(m_f, 0, m_f.nComp(), m_f.nGrowVect(), m_time, 0);
+
+    // FillBoundary/PhysBCFunct only enqueue GPU work; sync once here so that
+    // this function's BL_PROFILE time reflects actual execution rather than
+    // launch overhead, without forcing a sync inside any per-box kernel.
+    amrex::Gpu::streamSynchronize();
 }
 
 template <typename LatticeTag, typename CollisionModel>
