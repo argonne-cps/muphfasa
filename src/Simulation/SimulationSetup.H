@@ -56,6 +56,8 @@ public:
 
     amrex::Real time() const noexcept override { return m_time; }
     amrex::Real omega() const noexcept override { return m_omega; }
+    const UnitConverter& units() const noexcept override { return *m_units; }
+    const amrex::Geometry& geom() const noexcept override { return m_geom; }
 
 private:
     // ── Input and unit conversion ─────────────────────────────────────────
