@@ -1,12 +1,14 @@
 // Macroscopic.H — Interfaces for computing macroscopic fluid variables.
 // Derives density (rho) and velocity (u) from the distribution function f
 // by taking zeroth and first moments over the discrete velocity set.
-// Per-cell kernels are AMREX_GPU_HOST_DEVICE callable; their definitions live
-// in Macroscopic.cpp (explicit instantiations for each supported lattice).
+// computeDensityCell/computeVelocityCell2D/3D are defined inline here since
+// they're always_inline and called across translation units; computeVelocityCell
+// stays in Macroscopic.cpp since it's only called from within that file.
 
 #ifndef MUPHFASA_MACROSCOPIC_H
 #define MUPHFASA_MACROSCOPIC_H
 
+#include <AMReX_Array.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
@@ -21,7 +23,14 @@ namespace muphfasa {
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeDensityCell(amrex::Array4<const amrex::Real> const& f_arr,
-                               int i, int j, int k) noexcept;
+                               int i, int j, int k) noexcept
+{
+    amrex::Real rho = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        rho += f_arr(i, j, k, n);
+    }
+    return rho;
+}
 
 // u_alpha = (1/rho) * sum_q c_{q,alpha} * f_q, for a single cell.
 // Writes AMREX_SPACEDIM velocity components into vel_arr(i,j,k,*).
@@ -31,6 +40,40 @@ void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
                          const amrex::Real rho,
                          amrex::Array4<amrex::Real> const& vel_arr,
                          int i, int j, int k) noexcept;
+
+// GpuArray-returning variants: same math, returned as local scratch instead
+// of written into an Array4. Used by fused kernels with no MultiFab for u.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
+        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
+    }
+    return {ux / rho, uy / rho};
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       int i, int j, int k) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    amrex::Real uz = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
+        uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
+        uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
+    }
+    return {ux / rho, uy / rho, uz / rho};
+}
 
 // ── Array-level moment kernels ─────────────────────────────────────────────
 // f[q] holds the q-th distribution value for a single cell.
@@ -46,12 +89,6 @@ template <typename LatticeTag>
 void computeVelocity(const amrex::Box& box,
                      amrex::Array4<const amrex::Real> const& f_arr,
                      amrex::Array4<const amrex::Real> const& rho_arr,
-                     amrex::Array4<amrex::Real> const& vel_arr);
-
-template <typename LatticeTag>
-void computeVelocity(const amrex::Box& box,
-                     amrex::Array4<const amrex::Real> const& f_arr,
-                     amrex::Array4<amrex::Real> const& rho_arr,
                      amrex::Array4<amrex::Real> const& vel_arr);
 
 

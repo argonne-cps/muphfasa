@@ -1,0 +1,44 @@
+# Regression test: Lid-driven cavity flow (2-D square domain).
+# Well-known benchmark; compare streamfunction and vorticity against the
+# Ghia et al. (1982) tabulated values at Re=100.
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells       = 64 64   # Nx Ny
+grid.max_grid_size = 32
+grid.n_ghost      = 1
+
+# ── Simulation ─────────────────────────────────────────────────────────────
+sim.max_step      = 50000
+sim.stop_time     = -1.0
+
+# ── LBM ────────────────────────────────────────────────────────────────────
+lbm.lattice_type  = D2Q9
+
+# ── Physical units ─────────────────────────────────────────────────────────
+# tau (relaxation time) is derived from these via UnitConverter, not set
+# directly -- see SimulationImpl's constructor. ref_viscosity=0.01 gives the
+# Ghia et al. Re=100 this test benchmarks against; with N_ref =
+# max(grid.ncells) = 64 and the default lattice velocity U_lat=0.1, that
+# works out to tau=0.692.
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.ref_viscosity = 0.01   # = 1/Re; gives Re=100
+units.Re            = 100.0  # = ref_velocity*ref_length/ref_viscosity
+units.Ma            = 0.05
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+# All four walls are no-slip; top wall (y=H) moves at u_lid = Ma*cs.
+bc.lo_type = NoSlip  NoSlip
+bc.hi_type = NoSlip  MovingWall
+bc.hiy_Uwall = 0.05  0.0   # (vx, vy) in lattice units
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 1.0  1.0
+geometry.is_periodic = 0   0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 5000
+amr.chk_int         = 25000
+amr.plot_file       = plt
+amr.check_file      = chk

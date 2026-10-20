@@ -7,11 +7,12 @@
 #include "LatticeDescriptor.H"
 
 #include <AMReX_BLProfiler.H>
-#include <AMReX_ParallelFor.H>
+#include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
 
 // ── computeEquilibriumCell ────────────────────────────────────────────────
+// Reads u out of vel(i,j,k,*) and delegates to computeEquilibriumCell2D/3D.
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real computeEquilibriumCell(const amrex::Real rho,
@@ -19,25 +20,12 @@ amrex::Real computeEquilibriumCell(const amrex::Real rho,
                                    int i, int j, int k, int n) noexcept
 {
 #if (AMREX_SPACEDIM == 2)
-    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
-                            + vel(i, j, k, 1) * vel(i, j, k, 1);
-
-    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
-                             + LatticeTag::cy(n) * vel(i, j, k, 1);
+    const amrex::GpuArray<amrex::Real, 2> u = {vel(i, j, k, 0), vel(i, j, k, 1)};
+    return computeEquilibriumCell2D<LatticeTag>(rho, u, n);
 #else
-    const amrex::Real u_sq = vel(i, j, k, 0) * vel(i, j, k, 0)
-                            + vel(i, j, k, 1) * vel(i, j, k, 1)
-                            + vel(i, j, k, 2) * vel(i, j, k, 2);
-
-    const amrex::Real cdotu = LatticeTag::cx(n) * vel(i, j, k, 0)
-                             + LatticeTag::cy(n) * vel(i, j, k, 1)
-                             + LatticeTag::cz(n) * vel(i, j, k, 2);
+    const amrex::GpuArray<amrex::Real, 3> u = {vel(i, j, k, 0), vel(i, j, k, 1), vel(i, j, k, 2)};
+    return computeEquilibriumCell3D<LatticeTag>(rho, u, n);
 #endif
-
-    return LatticeTag::weights(n) * rho *
-           (1 + LatticeTag::cs2inv * cdotu
-              + 0.5 * LatticeTag::cs2inv * LatticeTag::cs2inv * cdotu * cdotu
-              - 0.5 * LatticeTag::cs2inv * u_sq);
 }
 
 // ── compute kernel ─────────────────────────────────────────────────────
@@ -76,19 +64,29 @@ void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
-template amrex::Real computeEquilibriumCell<D2Q9> (const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+// Dimension-matched only: computeEquilibriumCell branches on AMREX_SPACEDIM.
+#if (AMREX_SPACEDIM == 2)
+template amrex::Real computeEquilibriumCell<D2Q9>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+#else
 template amrex::Real computeEquilibriumCell<D3Q15>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
 template amrex::Real computeEquilibriumCell<D3Q19>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
 template amrex::Real computeEquilibriumCell<D3Q27>(const amrex::Real, amrex::Array4<amrex::Real const> const&, int, int, int, int);
+#endif
 
-template void computeEquilibrium<D2Q9> (const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+#if (AMREX_SPACEDIM == 2)
+template void computeEquilibrium<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+#else
 template void computeEquilibrium<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeEquilibrium<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeEquilibrium<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+#endif
 
-template void computeEquilibriumMF<D2Q9> (const amrex::MultiFab&, const amrex::MultiFab&, amrex::MultiFab&);
+#if (AMREX_SPACEDIM == 2)
+template void computeEquilibriumMF<D2Q9>(const amrex::MultiFab&, const amrex::MultiFab&, amrex::MultiFab&);
+#else
 template void computeEquilibriumMF<D3Q15>(const amrex::MultiFab&, const amrex::MultiFab&, amrex::MultiFab&);
 template void computeEquilibriumMF<D3Q19>(const amrex::MultiFab&, const amrex::MultiFab&, amrex::MultiFab&);
 template void computeEquilibriumMF<D3Q27>(const amrex::MultiFab&, const amrex::MultiFab&, amrex::MultiFab&);
+#endif
 
 } // namespace muphfasa

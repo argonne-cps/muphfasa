@@ -7,7 +7,7 @@
 #include "LatticeDescriptor.H"
 
 #include <AMReX_BLProfiler.H>
-#include <AMReX_ParallelFor.H>
+#include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
 
@@ -76,24 +76,37 @@ void streamInPlace(amrex::MultiFab&       f,
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────
-template amrex::Real streamCell<D2Q9> (amrex::Array4<const amrex::Real> const&, int, int, int, int);
+// Dimension-matched only: streamCell branches on AMREX_SPACEDIM.
+#if (AMREX_SPACEDIM == 2)
+template amrex::Real streamCell<D2Q9>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
+#else
 template amrex::Real streamCell<D3Q15>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
 template amrex::Real streamCell<D3Q19>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
 template amrex::Real streamCell<D3Q27>(amrex::Array4<const amrex::Real> const&, int, int, int, int);
+#endif
 
+#if (AMREX_SPACEDIM == 2)
 template void default_stream<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+#else
 template void default_stream<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void default_stream<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void default_stream<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+#endif
 
-template void stream<D2Q9> (const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+#if (AMREX_SPACEDIM == 2)
+template void stream<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+#else
 template void stream<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 template void stream<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 template void stream<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+#endif
 
-template void streamInPlace<D2Q9> (amrex::MultiFab&, const amrex::Geometry&);
+#if (AMREX_SPACEDIM == 2)
+template void streamInPlace<D2Q9>(amrex::MultiFab&, const amrex::Geometry&);
+#else
 template void streamInPlace<D3Q15>(amrex::MultiFab&, const amrex::Geometry&);
 template void streamInPlace<D3Q19>(amrex::MultiFab&, const amrex::Geometry&);
 template void streamInPlace<D3Q27>(amrex::MultiFab&, const amrex::Geometry&);
+#endif
 
 } // namespace muphfasa

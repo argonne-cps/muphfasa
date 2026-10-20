@@ -1,0 +1,42 @@
+# Regression test: Plane Poiseuille flow (2-D channel, pressure-driven).
+# Analytic solution: parabolic velocity profile u(y) = (dp/dx)/(2*mu) * y*(H-y).
+# Expected convergence: second-order in dx.
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells      = 4 32     # Nx Ny  (periodic in x, walls at y=0 and y=H)
+grid.max_grid_size = 32
+grid.n_ghost     = 1
+
+# ── Simulation ─────────────────────────────────────────────────────────────
+sim.max_step     = 10000
+sim.stop_time    = -1.0      # run to max_step
+
+# ── LBM ────────────────────────────────────────────────────────────────────
+lbm.lattice_type = D2Q9
+
+# ── Physical units ─────────────────────────────────────────────────────────
+# tau (relaxation time) is derived from these via UnitConverter, not set
+# directly -- see SimulationImpl's constructor. With N_ref = max(grid.ncells)
+# = 32 and the default lattice velocity U_lat=0.1, this gives tau=0.8.
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.ref_viscosity = 0.03125  # = 1/32; gives tau=0.8 at N_ref=32
+units.Re            = 32.0     # = ref_velocity*ref_length/ref_viscosity
+units.Ma            = 0.05
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+# x: periodic  (set automatically when ncells[0] > 1 and geom is periodic)
+# y: no-slip walls (bounce-back)
+bc.lo_type = Periodic  NoSlip
+bc.hi_type = Periodic  NoSlip
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 0.125  1.0
+geometry.is_periodic = 1   0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 1000
+amr.chk_int         = 5000
+amr.plot_file       = plt
+amr.check_file      = chk
