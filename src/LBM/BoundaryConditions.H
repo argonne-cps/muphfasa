@@ -102,7 +102,7 @@ public:
                 case lbmBCtype::MovingWall:
                     MovingWallKernel<LatticeTag>::apply(iv, dest, dir, bound,
                                                         m_face_rho_wall[faceIndex(dir, bound)],
-                                                        m_face_Uwall[faceIndex(dir, bound)]);
+                                                        m_face_vel[faceIndex(dir, bound)]);
                     break;
 
                 case lbmBCtype::NoSlip:
@@ -112,7 +112,7 @@ public:
                 case lbmBCtype::Inflow:
                     InflowKernel<LatticeTag>::apply(iv, dest, dir, bound,
                                                     m_face_rho_wall[faceIndex(dir, bound)],
-                                                    m_face_Uwall[faceIndex(dir, bound)]);
+                                                    m_face_vel[faceIndex(dir, bound)]);
                     break;
 
                 case lbmBCtype::Outflow:
@@ -136,8 +136,8 @@ public:
         m_face_rho_wall[faceIndex(dir, bound)] = rho;
     }
 
-    void setFaceUwall(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
-        m_face_Uwall[faceIndex(dir, bound)] = Uwall;
+    void setFaceVel(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
+        m_face_vel[faceIndex(dir, bound)] = Uwall;
     }
 
 private:
@@ -145,7 +145,7 @@ private:
     // wall density (MovingWall) or inflow density (Inflow)
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_rho_wall{};
     // wall velocity (MovingWall) or inflow velocity (Inflow)
-    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_Uwall{};
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_vel{};
 };
 
 // Face name -> our own dispatch enum. 
