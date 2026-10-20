@@ -88,6 +88,25 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE((m_u_lat < 0.3),
                 "u_lat does not satisfy low Mach number limit"
                 "Alter lbm.u_lat to fix.");
+
+
+    
+    // Print Unit settings
+    amrex::Print() << "Physical Inputs:" << std::endl
+                   << "Re: " << reynoldsNumber() << std::endl 
+                   << "U_phys: " << m_U_ref << std::endl
+                   << "L_phys: " << m_L_ref << std::endl
+                   << "nu_phys: " << m_nu_ref << std::endl
+                   << "Ngrid: " << N_ref << std::endl
+    
+                   << "Starting Simulation with Lattice Units:" << std::endl
+                   << "U_lat: " << m_u_lat << std::endl
+                   << "L_lat: " << toLatticeLength(m_L_ref) << std::endl
+                   << "nu_lat: " << m_nu_lat << std::endl
+                   << "tau: " << relaxationTime() << std::endl
+                   << "Ma: " << machNumber() << std::endl
+                   << "C_x: " << dx() << std::endl
+                   << "C_t: " << dt() << std::endl;
 }
 
 amrex::Real UnitConverter::toLatticeLength   (amrex::Real x_phys)   const noexcept { return x_phys / m_dx; }
