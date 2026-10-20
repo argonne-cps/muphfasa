@@ -65,7 +65,7 @@ void writeMacroPlotfile(const std::string&     file_name,
 std::string plotfileName(const std::string& prefix, int step)
 {
     std::ostringstream ss;
-    ss << prefix << std::setw(5) << std::setfill('0') << step;
+    ss << prefix << std::setw(7) << std::setfill('0') << step;
     return ss.str();
 }
 
