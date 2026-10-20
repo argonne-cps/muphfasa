@@ -133,7 +133,6 @@ int main(int argc, char* argv[])
                 amrex::Real err = analytic_vel.max(0);
                 max_err.push_back(err);
                 amrex::Print() << "At Time=" << step << ": Error=" << err << "\n";
-                //avg_err.push_back(analytic_vel.sum(0) / Ny);
             }
         }
 
@@ -147,61 +146,3 @@ int main(int argc, char* argv[])
     return 0;
     }
 }
-
-//void test_couette()
-//{
-//        // ── Check 1: steady state ────────────────────────────────────────
-//        const auto& final_profile = snapshot_profiles.back();
-//        amrex::Real max_err_steady = amrex::Real(0.0);
-//        for (int j = 0; j < Ny; ++j) {
-//            const amrex::Real y = j + amrex::Real(0.5);
-//            const amrex::Real u_exact = U0 * y / H;
-//            max_err_steady = std::max(max_err_steady, std::abs(final_profile[j] - u_exact));
-//        }
-//        amrex::Print() << "Max error vs. steady linear profile: " << max_err_steady << "\n";
-//
-//        // ── Check 2: time-dependent startup, tracked throughout ──────────
-//        amrex::Real max_err_transient = amrex::Real(0.0);
-//        for (std::size_t k = 0; k < snapshot_profiles.size(); ++k) {
-//            const amrex::Real t = snapshot_times[k];
-//            for (int j = 0; j < Ny; ++j) {
-//                const amrex::Real y = j + amrex::Real(0.5);
-//                const amrex::Real u_exact = analyticCouette(y, H, U0, nu, t);
-//                max_err_transient = std::max(max_err_transient,
-//                                             std::abs(snapshot_profiles[k][j] - u_exact));
-//            }
-//        }
-//        amrex::Print() << "Max error vs. time-dependent expansion (all snapshots): "
-//                       << max_err_transient << "\n";
-//
-//        // ── Check 3: the dominant mode decays at the theoretical rate ────
-//        // Fit ln|A1(t)| ~ -rate*t + const by least squares, skipping the
-//        // first few snapshots where higher harmonics still contaminate A1.
-//        const std::size_t skip = std::min<std::size_t>(3, snapshot_profiles.size() / 4);
-//        std::vector<amrex::Real> ts, log_amps;
-//        for (std::size_t k = skip; k < snapshot_profiles.size(); ++k) {
-//            const amrex::Real a1 = firstModeAmplitude(snapshot_profiles[k], H, U0, Ny);
-//            if (std::abs(a1) < amrex::Real(1.0e-12)) { continue; } // below float noise floor
-//            ts.push_back(snapshot_times[k]);
-//            log_amps.push_back(std::log(std::abs(a1)));
-//        }
-//
-//        const std::size_t n = ts.size();
-//        amrex::Real sum_t = 0, sum_l = 0, sum_tt = 0, sum_tl = 0;
-//        for (std::size_t k = 0; k < n; ++k) {
-//            sum_t  += ts[k];
-//            sum_l  += log_amps[k];
-//            sum_tt += ts[k] * ts[k];
-//            sum_tl += ts[k] * log_amps[k];
-//        }
-//        const amrex::Real denom = amrex::Real(n) * sum_tt - sum_t * sum_t;
-//        const amrex::Real fitted_slope = (amrex::Real(n) * sum_tl - sum_t * sum_l) / denom;
-//
-//        const amrex::Real analytic_rate = -kPi * kPi * nu / (H * H);
-//        const amrex::Real rel_err = std::abs((fitted_slope - analytic_rate) / analytic_rate);
-//        amrex::Print() << "Fitted n=1 mode decay rate: " << fitted_slope
-//                       << "  analytic: " << analytic_rate
-//                       << "  relative error: " << rel_err << "\n";
-//
-//        amrex::Print() << "All Couette regression checks passed.\n";
-//}
