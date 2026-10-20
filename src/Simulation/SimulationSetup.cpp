@@ -140,21 +140,16 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 {
     const auto names = m_params.bcNames();
 
-    // wall params in lattice units
+    // wall/inflow params in lattice units
     const auto rhoWall = m_units->toLatticeDensity(m_params.refDensity());
     auto Uwall = m_params.Uwall();
+    auto Uin = m_params.Uinflow();
     for (int wall_idx=0; wall_idx < 2 * AMREX_SPACEDIM; ++wall_idx) {
         for (int dim=0; dim < AMREX_SPACEDIM; ++dim) {
             Uwall[wall_idx][dim] = m_units->toLatticeVelocity(Uwall[wall_idx][dim]);
+            Uin[wall_idx][dim]   = m_units->toLatticeVelocity(Uin[wall_idx][dim]);
         }
     }
-    for (auto wall : Uwall) {
-        for (auto u : wall) {
-            amrex::Print() << u << ' ';
-        }
-    }
-
-
     BCManager<LatticeTag> bc_manager{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
         for (int bound : {-1, 1}) {
@@ -170,9 +165,16 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
             if (name == "MovingWall") {
                 bc_manager.setFaceDensity(dir, bound, rhoWall);
                 if (bound == -1)
-                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir]);
+                    bc_manager.setFaceVel(dir, bound, Uwall[2*dir]);
                 else if (bound == 1)
-                    bc_manager.setFaceUwall(dir, bound, Uwall[2*dir+1]);
+                    bc_manager.setFaceVel(dir, bound, Uwall[2*dir+1]);
+            } else if (name == "Inflow") {
+                // reuses the reference density as rho_in; see InputParser::Uinflow()
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                if (bound == -1)
+                    bc_manager.setFaceVel(dir, bound, Uin[2*dir]);
+                else if (bound == 1)
+                    bc_manager.setFaceVel(dir, bound, Uin[2*dir+1]);
             }
         }
     }
