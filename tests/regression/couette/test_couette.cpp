@@ -68,7 +68,7 @@ void calcAnalytic(amrex::MultiFab& vel, amrex::Real dy, amrex::Real H, amrex::Re
     const auto vely_arr = vel.array(mfi, 1);
 
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
-        amrex::Real y = dy * amrex::Real(j);
+        amrex::Real y = dy * (amrex::Real(j) + 0.5);
         velx_arr(i, j, k) = analyticCouette(y, H, U0, nu, t);
         vely_arr(i, j, k) = 0.;
     });
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
         // Get fundamental params
         const int Ny = params.ncells()[1];
         const amrex::Real H = amrex::Real(Ny);
-        const amrex::Real dy = amrex::Real(1) / H;
+        const amrex::Real dy = amrex::Real(1);
 
         const amrex::Real tau = sim->units().relaxationTime();
         const amrex::Real nu  = (tau - 0.5) / 3.0;
@@ -120,8 +120,8 @@ int main(int argc, char* argv[])
                 calcAnalytic(analytic_vel, dy, H, U0, nu, sim->time());
 
                 // convert to physical units
-                amrex::Real lat_vel_fact = sim->units().dx() /sim->units().dt();
-                analytic_vel.mult(lat_vel_fact, 0, 2);
+                //amrex::Real lat_vel_fact = sim->units().dx() /sim->units().dt();
+                //analytic_vel.mult(lat_vel_fact, 0, 2);
 
                 // write out file
                 muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
@@ -130,7 +130,9 @@ int main(int argc, char* argv[])
                 // calc avg and max error
                 analytic_vel.minus(sim_vel, 0, 1, 0);
                 analytic_vel.abs(0, 1, 0);
-                max_err.push_back(analytic_vel.max(0));
+                amrex::Real err = analytic_vel.max(0);
+                max_err.push_back(err);
+                amrex::Print() << "At Time=" << step << ": Error=" << err << "\n";
                 //avg_err.push_back(analytic_vel.sum(0) / Ny);
             }
         }
@@ -138,13 +140,8 @@ int main(int argc, char* argv[])
     // compute total max and avg error
     amrex::Real final_error = max_err.back();
 
-    // calc peak error
-    amrex::Real peak_error=0.0; 
-    for (auto err : max_err) { peak_error = err ? (err > peak_error) : peak_error; }
-
     //printout results
     amrex::Print() << "Final Steady state error: " <<  final_error << '\n';
-    amrex::Print() << "Peak error during sim: " <<  peak_error << '\n';
 
     amrex::Finalize();
     return 0;

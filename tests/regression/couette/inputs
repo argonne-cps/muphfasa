@@ -53,7 +53,7 @@ geometry.prob_lo    = 0.0  0.0
 geometry.prob_hi    = 0.125  1.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
-amr.plot_int        = 2000
+amr.plot_int        = 4000
 amr.chk_int         = 10000
 amr.plot_file       = plt
 amr.check_file      = chk
