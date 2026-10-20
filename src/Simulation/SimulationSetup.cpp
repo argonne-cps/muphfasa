@@ -143,11 +143,17 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
     // wall params in lattice units
     const auto rhoWall = m_units->toLatticeDensity(m_params.refDensity());
     auto Uwall = m_params.Uwall();
-    for (auto wall : Uwall) {
-        for (auto u : wall) {
-            u = m_units->toLatticeVelocity(u);
+    for (int wall_idx=0; wall_idx < 2 * AMREX_SPACEDIM; ++wall_idx) {
+        for (int dim=0; dim < AMREX_SPACEDIM; ++dim) {
+            Uwall[wall_idx][dim] = m_units->toLatticeVelocity(Uwall[wall_idx][dim]);
         }
     }
+    for (auto wall : Uwall) {
+        for (auto u : wall) {
+            amrex::Print() << u << ' ';
+        }
+    }
+
 
     BCManager<LatticeTag> bc_manager{};
     for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
