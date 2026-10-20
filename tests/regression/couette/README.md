@@ -21,7 +21,26 @@ Additionally, outputs the error for each writeout step as well as the final stea
 
 ## Plotting
 
-WIP: currently being reworked.
+`plot_couette.py` runs the solver with the base `inputs` file (writing the
+usual `plt<step>`/`analytic_plt<step>` pairs), laterally averages `vx` in
+each pair with AMReX's `faverage` tool to get a `vx(y)` profile, and plots:
+
+1. Velocity profiles `u/U0` vs. `y/H` at each snapshot time -- simulated
+   (markers) against the analytic solution (lines), both read straight from
+   the solver's own plotfiles.
+2. The dominant (n=1) Fourier mode's log-amplitude vs. time, with a fitted
+   decay rate compared against the analytic rate `pi^2*nu/H^2`.
+
+```sh
+make                    # build test_couette2d.gnu.ex, if not already built
+python3 plot_couette.py # builds faverage (DIM=2) on first run, then plots
+```
+
+The solver runs in its own `profile_run/` subdirectory (log in `run.log`).
+Output is written to `couette_decay.png`. Useful flags: `--inputs <path>`,
+`--override sim.max_step=8000 ...` (extra ParmParse overrides), `--no-run`
+(re-plot from an existing `profile_run/` without rerunning the solver),
+`--out <path>`.
 
 ## Convergence study
 
