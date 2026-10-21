@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
 """convergence3d.py — Grid-convergence study for the 3D plane Couette test.
 
-Runs test_couette (built with DIM=3) at several resolutions (Ny = 16, 32, 64 by default),
-pinning lbm.tau to the same value at every resolution so nu_lat (and hence
-the lattice wall Reynolds number) stays constant as the grid is refined --
-see the discussion in tests/regression/couette/README.md. Every run is
-stopped at the same dimensionless time nu*t/H^2 (well before steady state)
-so the comparison to the analytic solution is apples-to-apples across
-resolutions.
+Runs test_couette (built with DIM=3, wall-normal z) at several resolutions
+(Nz = 16, 32, 64 by default), pinning lbm.tau to the same value at every
+resolution so nu_lat (and hence the lattice wall Reynolds number) stays
+constant as the grid is refined. Every run is stopped at the same
+dimensionless time nu*t/H^2 (H=Nz, well before steady state) so the
+comparison is apples-to-apples across resolutions.
 
 Each run writes a matching plt<step>/analytic_plt<step> pair (already done
-by test_couette.cpp); this script diffs that pair with AMReX's fcompare
-tool and fits the observed order of accuracy from the inf-norm error on vx
-across consecutive doublings of Ny. (vy and vz are identically zero for plane
-Couette flow, so their fcompare "error" is pure round-off with no real
-convergence behavior to track.)
+by test_couette.cpp with WALL_DIM=z); this script diffs that pair with
+AMReX's fcompare tool and fits the observed order from the inf-norm error
+on vx across consecutive doublings of Nz. (vy and vz are identically zero
+for plane Couette flow, so their fcompare "error" is pure round-off.)
 
 Usage:
     cd tests/regression/couette
@@ -35,24 +33,31 @@ from pathlib import Path
 from helper import (
     COUETTE_DIR,
     CS2,
-    base_grid_ratio,
     ensure_fcompare,
     find_one,
     parse_fcompare,
 )
 
 
-def run_one(ny: int, nx: int, nz: int, tau: float, target_time: float,
+def _parse_ncells_3d(inputs_path: Path):
+    text = inputs_path.read_text()
+    m = re.search(r"^\s*grid\.ncells\s*=\s*(\d+)\s+(\d+)\s+(\d+)", text, re.MULTILINE)
+    if not m:
+        raise ValueError(f"could not find grid.ncells (3 ints) in {inputs_path}")
+    return int(m.group(1)), int(m.group(2)), int(m.group(3))
+
+
+def run_one(nz: int, nx: int, ny: int, tau: float, target_time: float,
             solver_exe: Path, base_inputs: Path, fcompare_exe: Path) -> dict:
     nu_lat = (tau - 0.5) * CS2
-    target_step = max(1, round(target_time * ny * ny / nu_lat))
+    target_step = max(1, round(target_time * nz * nz / nu_lat))
 
-    work_dir = COUETTE_DIR / "convergence_runs3d" / f"Ny{ny}"
+    work_dir = COUETTE_DIR / "convergence_runs3d" / f"Nz{nz}"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     overrides = [
         f"grid.ncells={nx} {ny} {nz}",
-        f"grid.max_grid_size={ny}",
+        f"grid.max_grid_size={nz}",
         f"lbm.tau={tau}",
         f"sim.max_step={target_step}",
         f"amr.plot_int={target_step}",
@@ -60,7 +65,7 @@ def run_one(ny: int, nx: int, nz: int, tau: float, target_time: float,
     ]
 
     log_path = work_dir / "run.log"
-    print(f"Ny={ny:4d}  Nx={nx:3d}  Nz={nz:3d}  target_step={target_step:6d}  "
+    print(f"Nz={nz:4d}  Nx={nx:3d}  Ny={ny:3d}  target_step={target_step:6d}  "
           f"(nu_lat={nu_lat:.4g}) -> {work_dir.relative_to(COUETTE_DIR)}")
     with open(log_path, "w") as log_file:
         subprocess.run(
@@ -89,13 +94,13 @@ def run_one(ny: int, nx: int, nz: int, tau: float, target_time: float,
 
     if "vx" not in errors:
         raise RuntimeError(
-            f"fcompare output for Ny={ny} did not contain a vx row; "
+            f"fcompare output for Nz={nz} did not contain a vx row; "
             f"see {work_dir / 'fcompare.log'}"
         )
 
     return {
-        "Ny": ny,
-        "dx": 1.0 / ny,
+        "Nz": nz,
+        "dx": 1.0 / nz,
         "target_step": target_step,
         "abs_err_vx": errors["vx"][0],
         "rel_err_vx": errors["vx"][1],
@@ -108,7 +113,7 @@ def observed_order(rows: list) -> list:
             row["order_vx"] = None
             continue
         prev = rows[i - 1]
-        ratio = row["Ny"] / prev["Ny"]
+        ratio = row["Nz"] / prev["Nz"]
         row["order_vx"] = (
             math.log(prev["abs_err_vx"] / row["abs_err_vx"]) / math.log(ratio)
             if row["abs_err_vx"] > 0 and prev["abs_err_vx"] > 0 else None
@@ -130,7 +135,7 @@ def plot_convergence(rows: list, plot_path: Path) -> None:
     ax.loglog(dx, ref, "k--", label="2nd-order reference")
     ax.set_xlabel("dx")
     ax.set_ylabel("abs_err_vx (inf-norm)")
-    ax.set_title("3D Couette grid convergence")
+    ax.set_title("3D Couette grid convergence (z-wall)")
     ax.legend()
     ax.grid(True, which="both", ls=":")
     fig.savefig(plot_path, dpi=150, bbox_inches="tight")
@@ -140,8 +145,10 @@ def plot_convergence(rows: list, plot_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ny-list", type=int, nargs="+", default=[16, 32, 64],
+    parser.add_argument("--nz-list", type=int, nargs="+", default=[16, 32, 64],
                          help="resolutions to run, in increasing order (default: 16 32 64)")
+    # Back-compat: --ny-list is alias for --nz-list for wall-normal Nz
+    parser.add_argument("--ny-list", type=int, nargs="+", default=None, help=argparse.SUPPRESS)
     parser.add_argument("--tau", type=float, default=0.8,
                          help="lbm.tau pinned at every resolution (default: 0.8)")
     parser.add_argument("--target-time", type=float, default=0.05,
@@ -157,30 +164,35 @@ def main() -> int:
     parser.add_argument("--no-plot", action="store_true",
                          help="skip generating the matplotlib plot")
     args = parser.parse_args()
+    if args.ny_list is not None:
+        args.nz_list = args.ny_list
 
     solver_exe = find_one("test_couette3d*.ex", COUETTE_DIR)
     fcompare_exe = ensure_fcompare(dim=3)
-    ratio = base_grid_ratio(args.base_inputs)
+    nx0, ny0, nz0 = _parse_ncells_3d(args.base_inputs)
 
     rows = []
-    for ny in sorted(args.ny_list):
-        nx = max(1, round(ny * ratio))
-        nz = nx
-        rows.append(run_one(ny, nx, nz, args.tau, args.target_time,
+    for nz in sorted(args.nz_list):
+        nx = max(1, round(nz * nx0 / nz0))
+        ny = max(1, round(nz * ny0 / nz0))
+        rows.append(run_one(nz, nx, ny, args.tau, args.target_time,
                              solver_exe, args.base_inputs, fcompare_exe))
 
     observed_order(rows)
 
-    header = f"{'Ny':>6}{'dx':>12}{'step':>8}{'abs_err_vx':>14}{'order_vx':>10}"
+    header = f"{'Nz':>6}{'dx':>12}{'step':>8}{'abs_err_vx':>14}{'order_vx':>10}"
     print("\n" + header)
     print("-" * len(header))
     for row in rows:
         ox = f"{row['order_vx']:.2f}" if row["order_vx"] is not None else "   -"
-        print(f"{row['Ny']:>6}{row['dx']:>12.5f}{row['target_step']:>8}"
+        print(f"{row['Nz']:>6}{row['dx']:>12.5f}{row['target_step']:>8}"
               f"{row['abs_err_vx']:>14.6e}{ox:>10}")
 
     with open(args.csv, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        # Keep legacy column name Ny for backwards compat with existing CSVs, but also write Nz
+        # New files use Nz; readers should handle either.
+        fieldnames = list(rows[0].keys())
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
     print(f"\nWrote {args.csv}")

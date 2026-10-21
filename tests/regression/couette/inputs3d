@@ -1,23 +1,23 @@
 # Regression test: Plane Couette flow (3-D channel, wall-driven shear).
-# Bottom wall (y=lo) stationary (NoSlip); top wall (y=hi) moving at U0
-# (MovingWall); periodic in x and z. No pressure gradient.
+# Bottom wall (z=lo) stationary (NoSlip); top wall (z=hi) moving at U0
+# (MovingWall); periodic in x and y. No pressure gradient.
+# Wall-normal is z in 3-D so faverage (which averages along the last
+# dimension) returns the z-profile; see test_couette.cpp WALL_DIM.
 #
 # Steady-state analytic solution: linear velocity profile
-#   u(y) = U0 * y/H
+#   u(z) = U0 * z/H
 # Time-dependent startup (impulsively-started plate, both walls held fixed
-# for t<=0, top wall set to U0 for t>0), solving du/dt = nu * d^2u/dy^2:
-#   u(y,t)/U0 = y/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*y/H)
+# for t<=0, top wall set to U0 for t>0), solving du/dt = nu * d^2u/dz^2:
+#   u(z,t)/U0 = z/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*z/H)
 #                     * exp(-n^2*pi^2*nu*t/H^2)
-# which is what tests/regression/couette/test_couette3d.cpp checks the
-# simulated profile against, both at late times (steady state) and
-# throughout the startup transient (time-dependent convergence).
+# which is what test_couette.cpp checks the simulated profile against.
 #
-# H (wall-to-wall distance, lattice units) = grid.ncells[1], per the
+# H (wall-to-wall distance, lattice units) = grid.ncells[2], per the
 # standard halfway-bounce-back convention (wall sits half a cell beyond
 # the last fluid node on each side).
 
 # ── Grid ──────────────────────────────────────────────────────────────────
-grid.ncells      = 4 32 4     # Nx Ny Nz (periodic in x,z, walls at y=0 and y=H)
+grid.ncells      = 4 4 32     # Nx Ny Nz (periodic in x,y, walls at z=0 and z=H)
 grid.max_grid_size = 32
 grid.n_ghost     = 1
 
@@ -47,18 +47,18 @@ units.Re            = 32.0 # implies nu = 1/32
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # x: periodic
-# y: NoSlip at y=lo, MovingWall at y=hi with wall velocity (U0, 0, 0)
-# z: periodic
-bc.lo_type = Periodic  NoSlip  Periodic
-bc.hi_type = Periodic  MovingWall  Periodic
-bc.hiy_Uwall = 1.  0.0  0.0   # (vx, vy, vz) in physical units
+# y: periodic
+# z: NoSlip at z=lo, MovingWall at z=hi with wall velocity (U0, 0, 0)
+bc.lo_type = Periodic  Periodic  NoSlip
+bc.hi_type = Periodic  Periodic  MovingWall
+bc.hiz_Uwall = 1.  0.0  0.0   # (vx, vy, vz) in physical units
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 # is_periodic is derived from bc.lo_type/bc.hi_type (GeometryHandler), not
 # read from a separate key -- these prob_lo/prob_hi values are only used to
 # set the physical domain extents for plotfile output.
 geometry.prob_lo    = 0.0  0.0  0.0
-geometry.prob_hi    = 0.125  1.0  0.125
+geometry.prob_hi    = 0.125  0.125  1.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 50
