@@ -115,10 +115,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
-    // Quiescent start: rho = 1 (lattice density unit), u = 0 everywhere.
-    // InputParser has no per-case IC parameters yet (e.g. lid velocity).
-    m_rho.setVal(amrex::Real(1.0));
-    m_vel.setVal(amrex::Real(0.0));
+    InitMacro(m_rho, m_vel);
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
 }
 

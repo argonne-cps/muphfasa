@@ -65,7 +65,8 @@ set(MUPHFASA_SOURCES
     src/Simulation/SimulationFactory.cpp
 )
 
-add_executable(muphfasa ${MUPHFASA_SOURCES})
+add_executable(muphfasa ${MUPHFASA_SOURCES}
+    src/Simulation/InitData.H)
 
 target_include_directories(muphfasa PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
