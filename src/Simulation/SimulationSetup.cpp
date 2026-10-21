@@ -8,6 +8,7 @@
 
 #include "SimulationSetup.H"
 
+#include "InitData.H"
 #include "IO/InputParser.H"
 #include "IO/Checkpoint.H"
 #include "IO/Plotfile.H"
@@ -169,7 +170,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::reportStageTiming(int step) con
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
-    InitMacro(m_rho, m_vel);
+    initData(m_rho, m_vel);
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
 }
 
