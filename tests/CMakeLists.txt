@@ -25,6 +25,11 @@ set(SOLVER_SOURCES_NO_MAIN
     ${CMAKE_SOURCE_DIR}/src/Simulation/SimulationFactory.cpp
 )
 
+# Default initial-condition routine (quiescent start); see
+# src/Simulation/InitData.cpp. add_regression_analysis_test() can override
+# this per-test with a problem-specific InitData.cpp (e.g. tgv2d's).
+set(DEFAULT_INIT_DATA ${CMAKE_SOURCE_DIR}/src/Simulation/InitData.cpp)
+
 set(UNIT_TEST_NAMES
     test_lattice
     test_macroscopic
@@ -33,9 +38,9 @@ set(UNIT_TEST_NAMES
 )
 
 foreach(test_name IN LISTS UNIT_TEST_NAMES)
-    add_executable(${test_name} unit/${test_name}.cpp ${SOLVER_SOURCES_NO_MAIN})
+    add_executable(${test_name} unit/${test_name}.cpp ${SOLVER_SOURCES_NO_MAIN} ${DEFAULT_INIT_DATA})
 
-    target_include_directories(${test_name} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_include_directories(${test_name} PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/Simulation)
 
     target_link_libraries(${test_name} PRIVATE AMReX::amrex_${muphfasa_DIM}d)
 
@@ -66,10 +71,19 @@ add_regression_test(lid_driven_cavity)
 # completion: build a dedicated executable, same idiom as the unit tests
 # above, and run it from its regression/<name>/ directory so it can find its
 # own "inputs" file via a relative path.
+# init_data (optional): path to an InitData.cpp overriding the default
+# quiescent initData() for this problem (e.g. an analytic initial velocity
+# field). Defaults to DEFAULT_INIT_DATA if omitted.
 function(add_regression_analysis_test name)
-    add_executable(test_${name} regression/${name}/test_${name}.cpp ${SOLVER_SOURCES_NO_MAIN})
+    if(ARGC GREATER 1)
+        set(init_data ${ARGV1})
+    else()
+        set(init_data ${DEFAULT_INIT_DATA})
+    endif()
 
-    target_include_directories(test_${name} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    add_executable(test_${name} regression/${name}/test_${name}.cpp ${SOLVER_SOURCES_NO_MAIN} ${init_data})
+
+    target_include_directories(test_${name} PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/Simulation)
     target_link_libraries(test_${name} PRIVATE AMReX::amrex_${muphfasa_DIM}d)
 
     if(AMReX_CUDA)
@@ -84,4 +98,4 @@ function(add_regression_analysis_test name)
 endfunction()
 
 add_regression_analysis_test(couette)
-add_regression_analysis_test(tgv2d)
+add_regression_analysis_test(tgv2d ${CMAKE_CURRENT_SOURCE_DIR}/regression/tgv2d/InitData.cpp)
