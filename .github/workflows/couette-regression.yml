@@ -76,9 +76,17 @@ jobs:
         working-directory: tests/regression/couette
         run: python3 convergence.py --ny-list 16 32 64 --min-order 2.5
 
-      - name: Grid-convergence study (3-D)
+      - name: Grid-convergence study (3-D D3Q15)
         working-directory: tests/regression/couette
-        run: python3 convergence3d.py --ny-list 16 32 64 --min-order 2.5
+        run: python3 convergence3d.py --lattice D3Q15 --nz-list 16 32 64 --min-order 2.5
+
+      - name: Grid-convergence study (3-D D3Q19)
+        working-directory: tests/regression/couette
+        run: python3 convergence3d.py --lattice D3Q19 --nz-list 16 32 64 --min-order 2.5
+
+      - name: Grid-convergence study (3-D D3Q27)
+        working-directory: tests/regression/couette
+        run: python3 convergence3d.py --lattice D3Q27 --nz-list 16 32 64 --min-order 2.5
 
       - name: Startup-transient profile + decay-rate check (2-D)
         working-directory: tests/regression/couette
@@ -100,4 +108,10 @@ jobs:
             tests/regression/couette/couette3d_convergence.png
             tests/regression/couette/couette3d_convergence.csv
             tests/regression/couette/couette3d_decay.png
+            tests/regression/couette/couette3d_D3Q15_convergence.png
+            tests/regression/couette/couette3d_D3Q15_convergence.csv
+            tests/regression/couette/couette3d_D3Q19_convergence.png
+            tests/regression/couette/couette3d_D3Q19_convergence.csv
+            tests/regression/couette/couette3d_D3Q27_convergence.png
+            tests/regression/couette/couette3d_D3Q27_convergence.csv
           if-no-files-found: ignore

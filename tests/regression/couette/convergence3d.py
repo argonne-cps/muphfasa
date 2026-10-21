@@ -48,11 +48,12 @@ def _parse_ncells_3d(inputs_path: Path):
 
 
 def run_one(nz: int, nx: int, ny: int, tau: float, target_time: float,
-            solver_exe: Path, base_inputs: Path, fcompare_exe: Path) -> dict:
+            solver_exe: Path, base_inputs: Path, fcompare_exe: Path, lattice: str | None = None) -> dict:
     nu_lat = (tau - 0.5) * CS2
     target_step = max(1, round(target_time * nz * nz / nu_lat))
 
-    work_dir = COUETTE_DIR / "convergence_runs3d" / f"Nz{nz}"
+    subdir = f"convergence_runs3d_{lattice}" if lattice else "convergence_runs3d"
+    work_dir = COUETTE_DIR / subdir / f"Nz{nz}"
     work_dir.mkdir(parents=True, exist_ok=True)
 
     overrides = [
@@ -63,6 +64,8 @@ def run_one(nz: int, nx: int, ny: int, tau: float, target_time: float,
         f"amr.plot_int={target_step}",
         f"amr.chk_int={target_step + 1}",
     ]
+    if lattice:
+        overrides.append(f"lbm.lattice_type={lattice}")
 
     log_path = work_dir / "run.log"
     print(f"Nz={nz:4d}  Nx={nx:3d}  Ny={ny:3d}  target_step={target_step:6d}  "
@@ -157,15 +160,25 @@ def main() -> int:
                          help="inputs file to derive bc/units/geometry from (default: ./inputs3d)")
     parser.add_argument("--min-order", type=float, default=None,
                          help="if set, exit non-zero when the worst observed order falls below this")
-    parser.add_argument("--csv", type=Path, default=COUETTE_DIR / "couette3d_convergence.csv",
-                         help="where to write the results table")
-    parser.add_argument("--plot", type=Path, default=COUETTE_DIR / "couette3d_convergence.png",
-                         help="where to write the convergence plot (default: ./couette3d_convergence.png)")
+    parser.add_argument("--lattice", type=str, default=None,
+                         choices=["D3Q15", "D3Q19", "D3Q27"],
+                         help="lbm.lattice_type override (default: from inputs, D3Q19)")
+    parser.add_argument("--csv", type=Path, default=None,
+                         help="where to write the results table (default: couette3d[_<lattice>]_convergence.csv)")
+    parser.add_argument("--plot", type=Path, default=None,
+                         help="where to write the convergence plot (default: couette3d[_<lattice>]_convergence.png)")
     parser.add_argument("--no-plot", action="store_true",
                          help="skip generating the matplotlib plot")
     args = parser.parse_args()
     if args.ny_list is not None:
         args.nz_list = args.ny_list
+    # Default csv/plot names include lattice suffix when lattice is specified
+    if args.csv is None:
+        suffix = f"_{args.lattice}" if args.lattice else ""
+        args.csv = COUETTE_DIR / f"couette3d{suffix}_convergence.csv"
+    if args.plot is None:
+        suffix = f"_{args.lattice}" if args.lattice else ""
+        args.plot = COUETTE_DIR / f"couette3d{suffix}_convergence.png"
 
     solver_exe = find_one("test_couette3d*.ex", COUETTE_DIR)
     fcompare_exe = ensure_fcompare(dim=3)
@@ -176,7 +189,7 @@ def main() -> int:
         nx = max(1, round(nz * nx0 / nz0))
         ny = max(1, round(nz * ny0 / nz0))
         rows.append(run_one(nz, nx, ny, args.tau, args.target_time,
-                             solver_exe, args.base_inputs, fcompare_exe))
+                             solver_exe, args.base_inputs, fcompare_exe, lattice=args.lattice))
 
     observed_order(rows)
 
