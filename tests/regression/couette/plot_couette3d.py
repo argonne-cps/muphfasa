@@ -52,8 +52,11 @@ def main() -> int:
                          help="extra ParmParse overrides, e.g. --override sim.max_step=8000")
     parser.add_argument("--no-run", action="store_true",
                          help="reuse an existing --run-dir instead of rerunning the solver")
-    parser.add_argument("--out", type=Path, default=COUETTE_DIR / "couette3d_decay.png",
-                         help="where to write the plot (default: ./couette3d_decay.png)")
+    parser.add_argument("--lattice", type=str, default=None,
+                         choices=["D3Q15", "D3Q19", "D3Q27"],
+                         help="lbm.lattice_type override (default: from inputs, D3Q19)")
+    parser.add_argument("--out", type=Path, default=None,
+                         help="where to write the plot (default: ./couette3d[_<lattice>]_decay.png)")
     parser.add_argument("--max-profile-err", type=float, default=None,
                          help="if set, exit non-zero when max|u_sim-u_analytic|/U0 "
                               "across all snapshots exceeds this")
@@ -61,6 +64,15 @@ def main() -> int:
                          help="if set, exit non-zero when the fitted decay rate's "
                               "relative error against pi^2*nu/H^2 exceeds this")
     args = parser.parse_args()
+    if args.out is None:
+        suffix = f"_{args.lattice}" if args.lattice else ""
+        args.out = COUETTE_DIR / f"couette3d{suffix}_decay.png"
+    # Use lattice-specific run dir to avoid clobbering when testing multiple lattices
+    if args.lattice and args.run_dir == COUETTE_DIR / "profile_run3d":
+        args.run_dir = COUETTE_DIR / f"profile_run3d_{args.lattice}"
+    # Propagate lattice override to solver via extra --override
+    if args.lattice:
+        args.override = list(args.override) + [f"lbm.lattice_type={args.lattice}"]
 
     solver_exe = find_one("test_couette3d*.ex", COUETTE_DIR)
     faverage_exe = ensure_faverage(dim=3)

@@ -92,9 +92,17 @@ jobs:
         working-directory: tests/regression/couette
         run: python3 plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01
 
-      - name: Startup-transient profile + decay-rate check (3-D)
+      - name: Startup-transient profile + decay-rate check (3-D D3Q15)
         working-directory: tests/regression/couette
-        run: python3 plot_couette3d.py --max-profile-err 0.01 --max-rate-rel-err 0.01
+        run: python3 plot_couette3d.py --lattice D3Q15 --max-profile-err 0.01 --max-rate-rel-err 0.01
+
+      - name: Startup-transient profile + decay-rate check (3-D D3Q19)
+        working-directory: tests/regression/couette
+        run: python3 plot_couette3d.py --lattice D3Q19 --max-profile-err 0.01 --max-rate-rel-err 0.01
+
+      - name: Startup-transient profile + decay-rate check (3-D D3Q27)
+        working-directory: tests/regression/couette
+        run: python3 plot_couette3d.py --lattice D3Q27 --max-profile-err 0.01 --max-rate-rel-err 0.01
 
       - name: Upload plots and data
         if: failure()
@@ -110,8 +118,11 @@ jobs:
             tests/regression/couette/couette3d_decay.png
             tests/regression/couette/couette3d_D3Q15_convergence.png
             tests/regression/couette/couette3d_D3Q15_convergence.csv
+            tests/regression/couette/couette3d_D3Q15_decay.png
             tests/regression/couette/couette3d_D3Q19_convergence.png
             tests/regression/couette/couette3d_D3Q19_convergence.csv
+            tests/regression/couette/couette3d_D3Q19_decay.png
             tests/regression/couette/couette3d_D3Q27_convergence.png
             tests/regression/couette/couette3d_D3Q27_convergence.csv
+            tests/regression/couette/couette3d_D3Q27_decay.png
           if-no-files-found: ignore
