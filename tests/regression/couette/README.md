@@ -1,94 +1,66 @@
 # Couette flow regression test
 
-Plane Couette flow: periodic in x, stationary wall at y=lo, wall moving at
+Plane Couette flow: periodic in x (and z in 3D), stationary wall at y=lo, wall moving at
 U0 at y=hi. Checks the simulated velocity profile against the analytic
 time-dependent plane-Couette-startup solution, both during the transient and
 at steady state. See the comment block at the top of `test_couette.cpp` for
-the full derivation.
+the full derivation. The single source `test_couette.cpp` builds for both
+2D and 3D via `AMREX_SPACEDIM`.
 
 ## Build and run
 
 ```sh
-make                       # builds test_couette2d.gnu.ex (DIM=2, no MPI)
+make DIM=2                  # builds test_couette2d.gnu.ex (default)
 ./test_couette2d.gnu.ex inputs
+
+make DIM=3                  # builds test_couette3d.gnu.ex
+./test_couette3d.gnu.ex inputs3d
 ```
+
+`lbm.lattice_type` must match `DIM`: `D2Q9` for 2D (`inputs`), `D3Q19`/`D3Q27`/`D3Q15` for 3D (`inputs3d` defaults to `D3Q19`). Lattices follow Krüger 2017 Tables 3.4–3.6 (`src/LBM/LatticeDescriptor.H`).
 
 ## Expected result
 
-saves `pltXXXXXXX` and `analyticXXXXXXX` which can be compared for accuracy.
-
-Additionally, outputs the error for each writeout step as well as the final steady-state error.
+saves `pltXXXXXXX` and `analytic_pltXXXXXXX` (same `rho`/`vel` layout, `vel` from `calcAnalytic()`) which can be compared with `fcompare`. The solver also prints per-snapshot `|u_sim-u_analytic|∞` and final steady-state error.
 
 ## Plotting
 
-`plot_couette.py` runs the solver with the base `inputs` file (writing the
-usual `plt<step>`/`analytic_plt<step>` pairs), laterally averages `vx` in
-each pair with AMReX's `faverage` tool to get a `vx(y)` profile, and plots:
+`plot_couette.py` (2D) and `plot_couette3d.py` (3D) run the solver with the
+base inputs, laterally average `vx` with AMReX's `faverage` to get `vx(y)`, and plot:
 
-1. Velocity profiles `u/U0` vs. `y/H` at each snapshot time -- simulated
-   (markers) against the analytic solution (lines), both read straight from
-   the solver's own plotfiles.
-2. The dominant (n=1) Fourier mode's log-amplitude vs. time, with a fitted
-   decay rate compared against the analytic rate `pi^2*nu/H^2`.
+1. Velocity profiles `u/U0` vs. `y/H` at each snapshot -- simulated (markers) vs analytic (lines).
+2. Dominant (n=1) Fourier mode log-amplitude vs. time with fitted decay rate `pi^2*nu/H^2`.
 
 ```sh
-make                    # build test_couette2d.gnu.ex, if not already built
-python3 plot_couette.py # builds faverage (DIM=2) on first run, then plots
+make DIM=2                  # build test_couette2d.gnu.ex
+python3 plot_couette.py     # builds faverage DIM=2, writes couette_decay.png
+
+make DIM=3
+python3 plot_couette3d.py   # builds faverage DIM=3, writes couette3d_decay.png
 ```
 
-The solver runs in its own `profile_run/` subdirectory (log in `run.log`).
-Output is written to `couette_decay.png`. Useful flags: `--inputs <path>`,
-`--override sim.max_step=8000 ...` (extra ParmParse overrides), `--no-run`
-(re-plot from an existing `profile_run/` without rerunning the solver),
-`--out <path>`, `--max-profile-err <tol>` / `--max-rate-rel-err <tol>` (exit
-non-zero if the max `|u_sim-u_analytic|/U0` across snapshots, or the fitted
-decay rate's relative error against `pi^2*nu/H^2`, exceeds the given
-tolerance -- used in CI; the very first snapshot right after the impulsive
-start is excluded from the profile-error check since the analytic Fourier
-series is still resolving a near step-function there).
+Runs in `profile_run/` (2D) / `profile_run3d/` (3D), log `run.log`. Flags: `--inputs <path>`,
+`--override sim.max_step=8000 ...`, `--no-run`, `--out <path>`, `--max-profile-err` / `--max-rate-rel-err` (CI thresholds; first snapshot excluded from profile check).
 
 ## Convergence study
 
-`convergence.py` runs the same problem at several resolutions (Ny = 16, 32,
-64 by default) and checks that the error against the analytic solution
-shrinks at the expected rate, rather than just checking a single grid.
-
-It pins `lbm.tau` to the same value at every resolution (via a command-line
-`ParmParse` override, not a separate inputs file) instead of scaling `Uwall`.
-Under this codebase's unit system (`src/LBM/Units.cpp`), the lattice wall
-Reynolds number is already resolution-independent as long as `tau` is
-pinned; leaving `tau` to its unpinned default instead makes it drift upward
-with `Ny` and risks instability at higher resolutions. All runs are also
-stopped at the same dimensionless time `nu*t/H^2 = 0.05` (well before steady
-state), so the comparison is apples-to-apples across resolutions.
+`convergence.py` (2D) and `convergence3d.py` (3D) run at Ny=16,32,64 and check error shrinks at expected rate. They pin `lbm.tau` (not `Uwall`) so `nu_lat=(tau-0.5)/3` and `Re` stay fixed; all runs stop at same `nu*t/H^2=0.05`.
 
 ```sh
-make                       # build test_couette2d.gnu.ex, if not already built
-python3 convergence.py     # builds fcompare (DIM=2) on first run, then runs the study
+make DIM=2
+python3 convergence.py      # fcompare DIM=2, writes couette_convergence.csv/.png
+
+make DIM=3
+python3 convergence3d.py    # fcompare DIM=3, writes couette3d_convergence.csv/.png
 ```
 
-Each resolution runs in its own `convergence_runs/Ny<N>/` subdirectory
-(solver log in `run.log`, `fcompare` output in `fcompare.log`). Results are
-printed as a table and written to `couette_convergence.csv`
-(`Ny, dx, target_step, abs_err_vx, order_vx`), plus a log-log plot of
-`abs_err_vx` vs. `dx` against a reference 2nd-order line in
-`couette_convergence.png` (requires `matplotlib`; skip with `--no-plot`).
+Each resolution in `convergence_runs/Ny<N>/` (2D) / `convergence_runs3d/Ny<N>/` (3D) with `run.log`/`fcompare.log`. Table columns `Ny,dx,target_step,abs_err_vx,order_vx`; order ~2 expected. Flags: `--ny-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`, `--min-order 1.8`, `--plot/--no-plot`. Only `vx` tracked (`vy`/`vz` ~0).
 
-Useful flags: `--ny-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`,
-`--min-order 1.8` (exit non-zero if the worst observed order falls below
-this), `--plot <path>`, `--no-plot`.
+## 3D contribution options
 
-`vy` is identically zero for this flow, so its `fcompare` "error" is pure
-round-off noise (~1e-15) with no real convergence behavior -- this script
-only tracks `vx`.
+- Lattice: `D3Q19` (default, 19 vel), `D3Q27` (full, more isotropic), `D3Q15` (light). Set `lbm.lattice_type` and `DIM=3`; ensure `grid.ncells` includes `Nz` and BCs have 3 entries (`Periodic NoSlip Periodic`).
+- Extending: add new `D3Qxx` in `LatticeDescriptor.H` (Krueger ordering), update `SimulationFactory`, and add `inputs*` variant. Verify with `convergence3d.py`.
 
 ## CI
 
-`.github/workflows/couette-regression.yml` builds `test_couette2d.gnu.ex`
-and runs both scripts on every push/PR touching `src/`,
-`tests/regression/couette/`, or the AMReX submodule:
-`convergence.py --min-order 2.5` and
-`plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01` (both
-thresholds leave roughly an order of magnitude of margin over the values
-observed locally). Plots and the convergence CSV are uploaded as workflow
-artifacts regardless of pass/fail.
+`.github/workflows/couette-regression.yml` builds `test_couette2d.gnu.ex` and runs `convergence.py --min-order 2.5` and `plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01`. Extend to 3D by adding `DIM=3` builds of `convergence3d.py`/`plot_couette3d.py`.
