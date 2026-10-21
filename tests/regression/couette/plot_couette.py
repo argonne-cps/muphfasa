@@ -24,8 +24,6 @@ Requires numpy + matplotlib (standard library otherwise).
 """
 
 import argparse
-import math
-import os
 import re
 import shutil
 import subprocess
@@ -34,108 +32,17 @@ from pathlib import Path
 
 import numpy as np
 
-COUETTE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = COUETTE_DIR.parents[2]
-# Match the GNUmakefile's "AMREX_HOME ?= .../external/amrex": respect an
-# AMREX_HOME already set in the environment so faverage is built against the
-# same AMReX tree test_couette2d.gnu.ex was linked against.
-AMREX_HOME = Path(os.environ.get("AMREX_HOME", REPO_ROOT / "external" / "amrex"))
-PLOTFILE_TOOLS_DIR = AMREX_HOME / "Tools" / "Plotfile"
-
-
-def find_one(pattern: str, directory: Path) -> Path:
-    matches = sorted(Path(directory).glob(pattern))
-    if not matches:
-        raise FileNotFoundError(f"no file matching {pattern!r} in {directory}")
-    return matches[0]
-
-
-def ensure_faverage() -> Path:
-    existing = sorted(PLOTFILE_TOOLS_DIR.glob("faverage*.ex"))
-    if existing:
-        return existing[0]
-
-    print("faverage binary not found -- building it (DIM=2, one-time)...")
-    subprocess.run(
-        ["make", "DIM=2", "programs=faverage"],
-        cwd=PLOTFILE_TOOLS_DIR,
-        check=True,
-    )
-    return find_one("faverage*.ex", PLOTFILE_TOOLS_DIR)
-
-
-def parse_inputs_values(text: str, key: str) -> list:
-    """Whitespace-separated numeric values following `key =` in an inputs
-    file (ParmParse syntax), ignoring trailing '#' comments."""
-    m = re.search(rf"^\s*{re.escape(key)}\s*=\s*([^\n#]+)", text, re.MULTILINE)
-    if not m:
-        raise ValueError(f"could not find {key!r} in inputs")
-    return [float(x) for x in m.group(1).split()]
-
-
-def apply_overrides(values: dict, overrides: list) -> dict:
-    """Overlay `key=value` CLI overrides (ParmParse syntax) onto a dict of
-    already-parsed inputs-file values, for the keys this script cares about."""
-    out = dict(values)
-    for ov in overrides:
-        key, _, val = ov.partition("=")
-        if key in out:
-            out[key] = [float(x) for x in val.split()]
-    return out
-
-
-UNITS_LOG_RE = {
-    "nu_lat": re.compile(r"^nu_lat:\s*([-+0-9.eE]+)", re.MULTILINE),
-    "C_x": re.compile(r"^C_x:\s*([-+0-9.eE]+)", re.MULTILINE),
-    "C_t": re.compile(r"^C_t:\s*([-+0-9.eE]+)", re.MULTILINE),
-}
-
-
-def parse_units_log(log_text: str) -> dict:
-    """Pull nu_lat/C_x/C_t straight from UnitConverter's own startup banner
-    (see src/LBM/Units.cpp) instead of re-deriving them in Python."""
-    out = {}
-    for key, pat in UNITS_LOG_RE.items():
-        m = pat.search(log_text)
-        if not m:
-            raise ValueError(f"could not find '{key}:' in solver log")
-        out[key] = float(m.group(1))
-    return out
-
-
-def run_solver(solver_exe: Path, inputs_path: Path, run_dir: Path, overrides: list) -> str:
-    if run_dir.exists():
-        shutil.rmtree(run_dir)
-    run_dir.mkdir(parents=True)
-
-    log_path = run_dir / "run.log"
-    with open(log_path, "w") as log_file:
-        subprocess.run(
-            [str(solver_exe), str(inputs_path), *overrides],
-            cwd=run_dir,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            check=True,
-        )
-    return log_path.read_text()
-
-
-def faverage_profile(faverage_exe: Path, pltdir: Path, varname: str = "vx"):
-    """Run faverage on one plotfile and return (height, value) arrays."""
-    subprocess.run(
-        [str(faverage_exe), "-v", varname, str(pltdir)],
-        capture_output=True, text=True, check=True,
-    )
-    slice_path = Path(str(pltdir) + ".slice")
-    data = np.loadtxt(slice_path, comments="#")
-    return data[:, 0], data[:, 1]
-
-
-def first_mode_amplitude(y_norm: np.ndarray, u_sim: np.ndarray, U0: float) -> float:
-    """Projection of (u_sim - steady) onto sin(pi*y_norm); see
-    analyticCouette()'s n=1 term in test_couette.cpp."""
-    deviation = u_sim - U0 * y_norm
-    return np.sum(deviation * np.sin(np.pi * y_norm)) * 2.0 / len(y_norm)
+from helper import (
+    COUETTE_DIR,
+    apply_overrides,
+    ensure_faverage,
+    faverage_profile,
+    find_one,
+    first_mode_amplitude,
+    parse_inputs_values,
+    parse_units_log,
+    run_solver,
+)
 
 
 def main() -> int:
@@ -158,8 +65,8 @@ def main() -> int:
                               "relative error against pi^2*nu/H^2 exceeds this")
     args = parser.parse_args()
 
-    solver_exe = find_one("test_couette*.ex", COUETTE_DIR)
-    faverage_exe = ensure_faverage()
+    solver_exe = find_one("test_couette*2d*.ex", COUETTE_DIR)
+    faverage_exe = ensure_faverage(dim=2)
 
     inputs_text = args.inputs.read_text()
     params = apply_overrides(
@@ -183,8 +90,6 @@ def main() -> int:
 
     units = parse_units_log(log_text)
     nu_lat = units["nu_lat"]
-    # Same conversion as UnitConverter::toLatticeVelocity (Units.cpp): the
-    # plotfiles store vx in lattice units, so U0 must be too.
     U0 = Uwall0 * units["C_t"] / units["C_x"]
     H = Ny
 
@@ -204,19 +109,16 @@ def main() -> int:
 
         y_phys, u_sim = faverage_profile(faverage_exe, pdir, "vx")
         _, u_analytic = faverage_profile(faverage_exe, analytic_dir, "vx")
+        if len(y_phys) != Ny:
+            raise RuntimeError(
+                f"faverage returned {len(y_phys)} bins but Ny={Ny}: faverage DIM mismatch "
+                "(averages along last dimension). Check that faverage was built with DIM=2."
+            )
         y_norm = (y_phys - y_lo) / domain_height
-
-        # sim->time() is step+1 (m_time starts at 0 and advance() increments
-        # it by 1.0 before output -- see SimulationSetup.cpp), matching the
-        # time actually passed to calcAnalytic() for this plotfile.
         times.append(step + 1.0)
         profiles.append((y_norm, u_sim, u_analytic))
 
     times = np.array(times)
-    # Skip the very first snapshot: right after the impulsive start, the
-    # analytic Fourier series is still resolving a near step-function profile
-    # and converges slowly there (Gibbs-like), which dwarfs any real solver
-    # error and isn't indicative of solver accuracy.
     profile_max_err = max(
         (float(np.max(np.abs(u_sim - u_analytic)))
          for _, u_sim, u_analytic in (profiles[1:] or profiles)),
@@ -228,19 +130,11 @@ def main() -> int:
     import matplotlib.pyplot as plt
 
     fig, (ax_profiles, ax_decay) = plt.subplots(1, 2, figsize=(11, 4.5))
-
-    # ── Panel 1: velocity profiles over time ────────────────────────────
-    # Geometric spacing, not linear: the transient decays exponentially, so
-    # evenly-spaced times mostly show already-converged profiles. With only
-    # a handful of snapshots (the common case -- one per amr.plot_int), just
-    # show all of them, including the near-rest t=1 one.
     n_total = len(times)
     if n_total <= 8:
         show_idx = np.arange(n_total)
     else:
-        show_idx = np.unique(np.round(
-            np.geomspace(1, n_total, 7)
-        ).astype(int) - 1)
+        show_idx = np.unique(np.round(np.geomspace(1, n_total, 7)).astype(int) - 1)
     cmap = plt.get_cmap("viridis")
 
     for k, idx in enumerate(show_idx):
@@ -248,7 +142,6 @@ def main() -> int:
         y_norm, u_sim, u_analytic = profiles[idx]
         order = np.argsort(y_norm)
         color = cmap(k / max(len(show_idx) - 1, 1))
-
         ax_profiles.plot(u_sim[order] / U0, y_norm[order], "o", color=color, ms=4,
                          label=f"t={t:.0f}")
         ax_profiles.plot(u_analytic[order] / U0, y_norm[order], "-", color=color, lw=1)
@@ -259,7 +152,6 @@ def main() -> int:
     ax_profiles.set_title("Couette startup: profile vs. time")
     ax_profiles.legend(fontsize=7, loc="lower right")
 
-    # ── Panel 2: dominant-mode decay rate ────────────────────────────────
     log_amps = []
     for y_norm, u_sim, _ in profiles:
         a1 = first_mode_amplitude(y_norm, u_sim, U0)

@@ -26,70 +26,20 @@ Requires only the Python standard library (except for plotting via matplotlib).
 
 import argparse
 import csv
-import glob
 import math
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-CS2 = 1.0 / 3.0  # lattice sound speed squared (D2Q9 / D3Q19, see LatticeDescriptor)
-
-COUETTE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = COUETTE_DIR.parents[2]
-# Match the GNUmakefile's "AMREX_HOME ?= .../external/amrex": respect an
-# AMREX_HOME already set in the environment so fcompare is built against the
-# same AMReX tree test_couette2d.gnu.ex was linked against.
-AMREX_HOME = Path(os.environ.get("AMREX_HOME", REPO_ROOT / "external" / "amrex"))
-PLOTFILE_TOOLS_DIR = AMREX_HOME / "Tools" / "Plotfile"
-
-
-def find_one(pattern: str, directory: Path) -> Path:
-    matches = sorted(directory.glob(pattern))
-    if not matches:
-        raise FileNotFoundError(f"no file matching {pattern!r} in {directory}")
-    return matches[0]
-
-
-def ensure_fcompare() -> Path:
-    existing = sorted(PLOTFILE_TOOLS_DIR.glob("fcompare*.ex"))
-    if existing:
-        return existing[0]
-
-    print("fcompare binary not found -- building it (DIM=2, one-time)...")
-    subprocess.run(
-        ["make", "DIM=2", "programs=fcompare"],
-        cwd=PLOTFILE_TOOLS_DIR,
-        check=True,
-    )
-    return find_one("fcompare*.ex", PLOTFILE_TOOLS_DIR)
-
-
-def base_grid_ratio(inputs_path: Path) -> float:
-    """Nx/Ny ratio from the base inputs file's grid.ncells, so refined runs
-    keep square cells."""
-    text = inputs_path.read_text()
-    m = re.search(r"^\s*grid\.ncells\s*=\s*(\d+)\s+(\d+)", text, re.MULTILINE)
-    if not m:
-        raise ValueError(f"could not find grid.ncells in {inputs_path}")
-    nx0, ny0 = int(m.group(1)), int(m.group(2))
-    return nx0 / ny0
-
-
-FCOMPARE_ROW_RE = re.compile(
-    r"^\s*(\S+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s*$"
+from helper import (
+    COUETTE_DIR,
+    CS2,
+    base_grid_ratio,
+    ensure_fcompare,
+    find_one,
+    parse_fcompare,
 )
-
-
-def parse_fcompare(output: str) -> dict:
-    """Map variable name -> (abs_err, rel_err) from fcompare's stdout table."""
-    errors = {}
-    for line in output.splitlines():
-        m = FCOMPARE_ROW_RE.match(line)
-        if m and m.group(1) in ("density", "vx", "vy", "vz"):
-            errors[m.group(1)] = (float(m.group(2)), float(m.group(3)))
-    return errors
 
 
 def run_one(ny: int, nx: int, tau: float, target_time: float,
@@ -130,9 +80,6 @@ def run_one(ny: int, nx: int, tau: float, target_time: float,
             f"see {log_path} for solver output"
         )
 
-    # fcompare exits non-zero whenever the (default zero) tolerances aren't
-    # met, which is every run here -- the error, not the exit code, is what
-    # we're after, so don't check=True.
     result = subprocess.run(
         [str(fcompare_exe), str(plt_dir), str(analytic_dir)],
         capture_output=True, text=True,
@@ -156,8 +103,6 @@ def run_one(ny: int, nx: int, tau: float, target_time: float,
 
 
 def observed_order(rows: list) -> list:
-    """Append an order-of-accuracy estimate between consecutive rows,
-    assuming each Ny is double the previous one."""
     for i, row in enumerate(rows):
         if i == 0:
             row["order_vx"] = None
@@ -172,16 +117,12 @@ def observed_order(rows: list) -> list:
 
 
 def plot_convergence(rows: list, plot_path: Path) -> None:
-    """Log-log plot of abs_err_vx vs dx against a reference 2nd-order line."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     dx = [row["dx"] for row in rows]
     err_vx = [row["abs_err_vx"] for row in rows]
-
-    # Anchor the reference 2nd-order line to the coarsest point so it's
-    # visually comparable rather than just a slope indicator.
     ref = [err_vx[0] * (d / dx[0]) ** 2 for d in dx]
 
     fig, ax = plt.subplots()
@@ -217,8 +158,8 @@ def main() -> int:
                          help="skip generating the matplotlib plot")
     args = parser.parse_args()
 
-    solver_exe = find_one("test_couette*.ex", COUETTE_DIR)
-    fcompare_exe = ensure_fcompare()
+    solver_exe = find_one("test_couette*2d*.ex", COUETTE_DIR)
+    fcompare_exe = ensure_fcompare(dim=2)
     ratio = base_grid_ratio(args.base_inputs)
 
     rows = []
