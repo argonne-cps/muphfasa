@@ -78,7 +78,7 @@ function(add_regression_analysis_test name)
 
     add_test(
         NAME regression_${name}
-        COMMAND $<TARGET_FILE:test_${name}>
+        COMMAND $<TARGET_FILE:test_${name}> inputs
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/regression/${name}
     )
 endfunction()

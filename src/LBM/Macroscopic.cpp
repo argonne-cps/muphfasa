@@ -6,6 +6,7 @@
 #include "Macroscopic.H"
 #include "LatticeDescriptor.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
@@ -38,6 +39,8 @@ void computeDensity(const amrex::Box& box,
                     amrex::Array4<amrex::Real> const& rho_arr)
 
 {
+    BL_PROFILE("computeDensity()");
+
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         rho_arr(i, j, k) = computeDensityCell<LatticeTag>(f_arr, i, j, k);
     });
@@ -51,6 +54,8 @@ void computeVelocity(const amrex::Box& box,
                      amrex::Array4<const amrex::Real> const& rho_arr,
                      amrex::Array4<amrex::Real> const& vel_arr)
 {
+    BL_PROFILE("computeVelocity()");
+
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
         computeVelocityCell<LatticeTag>(f_arr, rho_arr(i, j, k), vel_arr, i, j, k);
     });
@@ -63,6 +68,8 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
                         amrex::MultiFab&       rho_mf,
                         amrex::MultiFab&       vel_mf)
 {
+    BL_PROFILE("computeMacroscopic()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -75,6 +82,9 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
         computeDensity<LatticeTag>(tileBox, f_arr, rho);
         computeVelocity<LatticeTag>(tileBox, f_arr, rho, vel);
     }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────

@@ -10,6 +10,7 @@
 #include <AMReX_REAL.H>
 
 #include <array>
+#include <optional>
 #include <string>
 
 namespace muphfasa {
@@ -33,14 +34,22 @@ public:
     // ── LBM parameters ───────────────────────────────────────────────────
     std::string latticeType()    const;  // "D2Q9" | "D3Q15" | "D3Q19" | "D3Q27"
     std::string collisionModel() const;  // "BGK" | "TRT" | "MRT"
-    amrex::Real tau()             const;  // relaxation time [lattice units]
+
+    // tau (relaxation time) and u_lat (dimensionless lattice reference
+    // velocity) are two ways of pinning the same lattice-spacing choice --
+    // see UnitConverter. At most one is normally given; nullopt means "not
+    // specified in the input file", not zero. Supplying both is allowed
+    // only if they're consistent with the other physical reference scales
+    // (UnitConverter's constructor checks this and aborts otherwise).
+    // Supplying neither falls back to UnitConverter's default u_lat.
+    std::optional<amrex::Real> relaxationTime() const;  // lbm.tau
+    std::optional<amrex::Real> latticeVelocity() const; // lbm.u_lat
 
     // ── Physical / unit parameters ────────────────────────────────────────
     amrex::Real reynoldsNumber() const;
     amrex::Real machNumber()     const;
     amrex::Real refLength()      const;   // [m]
     amrex::Real refVelocity()    const;   // [m/s]
-    amrex::Real refViscosity()   const;   // [m^2/s]
     amrex::Real refDensity()     const;   // [kg/m^3]
 
     // ── Geometry ─────────────────────────────────────────────────────────
@@ -56,6 +65,11 @@ public:
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
     amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall() const;
+
+    // Per-face inflow velocity (bc.lox_Uin, bc.hix_Uin, ...), same shape as
+    // Uwall() but with no restriction on the normal component (inflow
+    // velocity is expected to point into the domain).
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uinflow() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;

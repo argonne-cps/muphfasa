@@ -55,6 +55,9 @@ public:
     const amrex::MultiFab& vel() const noexcept override { return m_vel; }
 
     amrex::Real time() const noexcept override { return m_time; }
+    amrex::Real omega() const noexcept override { return m_omega; }
+    const UnitConverter& units() const noexcept override { return *m_units; }
+    const amrex::Geometry& geom() const noexcept override { return m_geom; }
 
 private:
     // ── Input and unit conversion ─────────────────────────────────────────
@@ -82,10 +85,21 @@ private:
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
 
+    // ── Per-stage wall-clock timers ───────────────────────────────────────
+    // Accumulated in advance() over the steps since the last timing report,
+    // then averaged/printed and reset in writeOutput(). mutable because
+    // writeOutput() is const but still needs to reset these after reporting.
+    mutable amrex::Real m_t_collide = amrex::Real(0.0);
+    mutable amrex::Real m_t_ghost   = amrex::Real(0.0);
+    mutable amrex::Real m_t_stream  = amrex::Real(0.0);
+    mutable amrex::Real m_t_macro   = amrex::Real(0.0);
+    mutable int         m_steps_since_report = 0;
+
     // ── Private helpers ───────────────────────────────────────────────────
     void setInitialConditions();
     void fillGhostCells();
     void buildBCManager();
+    void reportStageTiming(int step) const;
 };
 
 } // namespace muphfasa

@@ -102,7 +102,7 @@ public:
                 case lbmBCtype::MovingWall:
                     MovingWallKernel<LatticeTag>::apply(iv, dest, dir, bound,
                                                         m_face_rho_wall[faceIndex(dir, bound)],
-                                                        m_face_Uwall[faceIndex(dir, bound)]);
+                                                        m_face_vel[faceIndex(dir, bound)]);
                     break;
 
                 case lbmBCtype::NoSlip:
@@ -110,7 +110,9 @@ public:
                     break;
 
                 case lbmBCtype::Inflow:
-                    InflowKernel<LatticeTag>::apply(iv, dest, dir, bound);
+                    InflowKernel<LatticeTag>::apply(iv, dest, dir, bound,
+                                                    m_face_rho_wall[faceIndex(dir, bound)],
+                                                    m_face_vel[faceIndex(dir, bound)]);
                     break;
 
                 case lbmBCtype::Outflow:
@@ -129,18 +131,21 @@ public:
         m_face_bc[faceIndex(dir, bound)] = kind;
     }
 
+    // rho/Uwall below are also used as rho_in/Uin for Inflow faces.
     void setFaceDensity(int dir, int bound, amrex::Real rho) {
         m_face_rho_wall[faceIndex(dir, bound)] = rho;
     }
 
-    void setFaceUwall(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
-        m_face_Uwall[faceIndex(dir, bound)] = Uwall;
+    void setFaceVel(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
+        m_face_vel[faceIndex(dir, bound)] = Uwall;
     }
 
 private:
     amrex::GpuArray<lbmBCtype, 2 * AMREX_SPACEDIM> m_face_bc{};
+    // wall density (MovingWall) or inflow density (Inflow)
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_rho_wall{};
-    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_Uwall{};
+    // wall velocity (MovingWall) or inflow velocity (Inflow)
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_vel{};
 };
 
 // Face name -> our own dispatch enum. 

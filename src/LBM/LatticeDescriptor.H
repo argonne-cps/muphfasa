@@ -7,7 +7,6 @@
 #ifndef MUPHFASA_LATTICE_DESCRIPTOR_H
 #define MUPHFASA_LATTICE_DESCRIPTOR_H
 
-#include <AMReX_Array.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_REAL.H>
 
@@ -32,19 +31,19 @@ struct LatticeDescriptor<2, 9>
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cx(int q) noexcept {
-        constexpr amrex::GpuArray<int, 9> d = { 0, 1, 0, -1, 0, 1, -1, -1, 1 };
+        constexpr int d[9] = { 0, 1, 0, -1, 0, 1, -1, -1, 1 };
         return d[q];
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cy(int q) noexcept {
-        constexpr amrex::GpuArray<int, 9> d = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };
+        constexpr int d[9] = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };
         return d[q];
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr amrex::Real weights(int q) noexcept {
-        constexpr amrex::GpuArray<amrex::Real, 9> d = {
+        constexpr amrex::Real d[9] = {
             amrex::Real(4.0/9.0),
             amrex::Real(1.0/9.0),  amrex::Real(1.0/9.0),
             amrex::Real(1.0/9.0),  amrex::Real(1.0/9.0),
@@ -57,7 +56,7 @@ struct LatticeDescriptor<2, 9>
     // opposite[q]: index r such that c_r = -c_q  (used in bounce-back BCs)
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int opposite(int q) noexcept {
-        constexpr amrex::GpuArray<int, 9> d = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
+        constexpr int d[9] = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
         return d[q];
     }
 };

@@ -9,6 +9,8 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include <LBM/Units.H>
+
 namespace muphfasa {
 
 class ISimulation
@@ -27,6 +29,13 @@ public:
     virtual const amrex::MultiFab& vel() const noexcept = 0;
 
     virtual amrex::Real time() const noexcept = 0;
+
+    // BGK relaxation parameter actually in use (omega = 1/tau), derived from
+    // UnitConverter::relaxationTime<LatticeTag>() -- see SimulationImpl's
+    // constructor.
+    virtual amrex::Real omega() const noexcept = 0;
+    virtual const UnitConverter& units() const noexcept = 0;
+    virtual const amrex::Geometry& geom() const noexcept = 0;
 };
 
 } // namespace muphfasa

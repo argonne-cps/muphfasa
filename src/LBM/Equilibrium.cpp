@@ -6,6 +6,7 @@
 #include "Equilibrium.H"
 #include "LatticeDescriptor.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
@@ -34,6 +35,8 @@ void computeEquilibrium(const amrex::Box& box,
                                amrex::Array4<amrex::Real const> const& vel,
                                amrex::Array4<amrex::Real> const& feq_arr) {
 
+        BL_PROFILE("computeEquilibrium()");
+
         amrex::ParallelFor(box, LatticeTag::Q, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
             feq_arr(i, j, k, n) = computeEquilibriumCell<LatticeTag>(rho(i, j, k), vel, i, j, k, n);
         });
@@ -45,6 +48,8 @@ void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
                            const amrex::MultiFab& vel_mf,
                            amrex::MultiFab&       feq_mf)
 {
+    BL_PROFILE("computeEquilibriumMF()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -56,6 +61,9 @@ void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
         amrex::Array4<amrex::Real const> const& vel = vel_mf[mfi].const_array();
         computeEquilibrium<LatticeTag>(tileBox, rho, vel, feq_arr);
     }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────

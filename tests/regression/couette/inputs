@@ -22,23 +22,35 @@ grid.max_grid_size = 32
 grid.n_ghost     = 1
 
 # ── Simulation ─────────────────────────────────────────────────────────────
-sim.max_step     = 20000
+# max_step/plot_int chosen so plot_couette.py's default run lands snapshots
+# near characteristic times nu*t/H^2 = 0.005, 0.05, 0.5 (H=32, nu_lat=0.1
+# below, so H^2/nu_lat=10240): step 50 -> ~0.005, step 500 -> ~0.05,
+# step 5000 -> ~0.5 (already near steady state, decay rate pi^2*nu/H^2).
+# plot_int=50 is the largest common divisor of those three steps, so they
+# all land on an actual output exactly -- convergence.py overrides
+# sim.max_step/amr.plot_int/amr.chk_int itself, so this has no effect there.
+sim.max_step     = 5000
 sim.stop_time    = -1.0      # run to max_step
 
 # ── LBM ────────────────────────────────────────────────────────────────────
 lbm.lattice_type = D2Q9
-lbm.tau          = 0.8       # nu_lat = cs2*(tau-0.5) = 0.1 [lattice units]
 
 # ── Physical units ─────────────────────────────────────────────────────────
-units.Re         = 16.0
-units.Ma         = 0.05
+# tau is derived (SimulationImpl ctor) from these via UnitConverter, with
+# N_ref = max(grid.ncells) = 32 and the default lattice velocity U_lat=0.1:
+#   dx = ref_length/N_ref,  dt = U_lat*dx/ref_velocity
+#   nu_lat = ref_viscosity*dt/dx^2 = 0.1 [lattice units]
+#   tau = nu_lat/cs2 + 0.5 = 0.8
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0 # match wall velocity
+units.Re            = 32.0 # implies nu = 1/32
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # x: periodic
 # y: NoSlip at y=lo, MovingWall at y=hi with wall velocity (U0, 0)
 bc.lo_type = Periodic  NoSlip
 bc.hi_type = Periodic  MovingWall
-bc.hiy_Uwall = 0.05  0.0   # (vx, vy) in lattice units -- vx is U0
+bc.hiy_Uwall = 1.  0.0   # (vx, vy) in physical units
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 # is_periodic is derived from bc.lo_type/bc.hi_type (GeometryHandler), not
@@ -48,7 +60,7 @@ geometry.prob_lo    = 0.0  0.0
 geometry.prob_hi    = 0.125  1.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
-amr.plot_int        = 2000
-amr.chk_int         = 10000
+amr.plot_int        = 50
+amr.chk_int         = 5000
 amr.plot_file       = plt
 amr.check_file      = chk
