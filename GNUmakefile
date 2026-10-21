@@ -8,67 +8,24 @@
 #   make DIM=2 USE_OMP=TRUE          OpenMP-threaded build
 #   make DIM=2 USE_CUDA=TRUE         NVIDIA GPU build
 #   make DIM=2 USE_HIP=TRUE          AMD GPU build
+#
+# All the shared build logic (AMReX modules, solver sources, Make.rules)
+# lives in Make.muphfasa; this file only supplies the executable's own
+# name and its own translation unit (main.cpp).
 
-AMREX_HOME ?= $(CURDIR)/external/amrex
+TOP := .
 
-# Compiler collection: gnu | intel | cray | pgi | llvm
 COMP ?= gnu
+DIM  ?= 3
 
-# Dimensionality (2 or 3)
-DIM ?= 3
-
-# Build flags
 DEBUG    ?= FALSE
 USE_MPI  ?= TRUE
 USE_OMP  ?= FALSE
 USE_CUDA ?= FALSE
 USE_HIP  ?= FALSE
-USE_EB   ?= TRUE
-
-# No Fortran sources in this project.
-BL_NO_FORT = TRUE
 
 EBASE = muphfasa
 
-# ── Source locations ───────────────────────────────────────────────────────────
-VPATH_LOCATIONS   += src
-VPATH_LOCATIONS   += src/LBM
-VPATH_LOCATIONS   += src/Geometry
-VPATH_LOCATIONS   += src/IO
-VPATH_LOCATIONS   += src/Simulation
-
-INCLUDE_LOCATIONS += src
-INCLUDE_LOCATIONS += src/LBM
-INCLUDE_LOCATIONS += src/Geometry
-INCLUDE_LOCATIONS += src/IO
-INCLUDE_LOCATIONS += src/Simulation
-
-# ── Translation units ──────────────────────────────────────────────────────────
 CEXE_sources += main.cpp
-CEXE_sources += LatticeDescriptor.cpp
-CEXE_sources += Macroscopic.cpp
-CEXE_sources += Equilibrium.cpp
-CEXE_sources += Streaming.cpp
-CEXE_sources += Collision.cpp
-CEXE_sources += BoundaryConditions.cpp
-CEXE_sources += Units.cpp
-CEXE_sources += GeometryHandler.cpp
-CEXE_sources += InputParser.cpp
-CEXE_sources += Checkpoint.cpp
-CEXE_sources += Plotfile.cpp
-CEXE_sources += SimulationSetup.cpp
-CEXE_sources += SimulationFactory.cpp
-CEXE_sources += InitData.cpp
 
-include $(AMREX_HOME)/Tools/GNUMake/Make.defs
-
-# ── AMReX library modules ────────────────────────────────────────────────────────
-# Base    : core data structures (MultiFab, BoxArray, Geometry, ParmParse, ...)
-# Boundary: ghost-cell/boundary-fill infrastructure, used by the EB module
-# AmrCore : Interpolater base class, used by the EB module
-# EB      : embedded-boundary geometry (AMReX_EB2.H, AMReX_EBFabFactory.H)
-Pdirs := Base Boundary AmrCore EB
-Ppack += $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
-include $(Ppack)
-
-include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+include $(TOP)/Make.muphfasa

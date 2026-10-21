@@ -1,0 +1,24 @@
+# Make.package for the muphfasa solver library.
+#
+# Lists the solver's own translation units (everything except main.cpp,
+# since every program that links this package -- the main solver, the unit
+# tests, the regression tests -- defines its own main()). Each program's
+# GNUmakefile includes ../Make.muphfasa (or the appropriate relative path),
+# which pulls this file in and sets up VPATH/INCLUDE_LOCATIONS for the
+# src/LBM, src/Geometry, src/IO, src/Simulation subdirectories so these
+# sources are found regardless of which one they live in.
+
+CEXE_sources += LatticeDescriptor.cpp
+CEXE_sources += Macroscopic.cpp
+CEXE_sources += Equilibrium.cpp
+CEXE_sources += Streaming.cpp
+CEXE_sources += Collision.cpp
+CEXE_sources += BoundaryConditions.cpp
+CEXE_sources += Units.cpp
+CEXE_sources += GeometryHandler.cpp
+CEXE_sources += InputParser.cpp
+CEXE_sources += Checkpoint.cpp
+CEXE_sources += Plotfile.cpp
+CEXE_sources += SimulationSetup.cpp
+CEXE_sources += SimulationFactory.cpp
+CEXE_sources += InitData.cpp
