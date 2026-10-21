@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """plot_couette3d.py — Run the 3D Couette test and plot the startup transient.
 
-End-to-end driver (same style as convergence3d.py): runs test_couette (built with DIM=3)
-with the base `inputs3d` file (writing matching plt<step>/analytic_plt<step> pairs as it
-already does), laterally averages vx in each pair with AMReX's `faverage`
-tool to get a vx(y) profile, and renders two panels:
-  1. Velocity profiles u(y)/U0 vs y/H at several snapshot times, simulated
-     (markers) vs. the analytic time-dependent solution (lines) -- both read
-     straight from the solver's own plotfiles, so the analytic curve is
-     exactly what the regression test compares against.
-  2. log|A1(t)|, the amplitude of the dominant (n=1) Fourier mode of the
-     simulated profile, vs. time, with a fitted straight line -- its slope is
-     the measured decay rate, compared against the analytic rate
-     pi^2*nu/H^2 printed in the legend.
+End-to-end driver (same style as convergence3d.py): runs test_couette (built with DIM=3,
+wall-normal z) with the base `inputs3d` file (writing matching plt<step>/analytic_plt<step>
+pairs as it already does), laterally averages vx in each pair with AMReX's `faverage`
+tool (which averages along the last dimension, z, matching the wall normal) to get a
+vx(z) profile, and renders two panels:
+  1. Velocity profiles u(z)/U0 vs z/H at several snapshot times, simulated
+     (markers) vs. the analytic time-dependent solution (lines)
+  2. log|A1(t)|, the amplitude of the dominant (n=1) Fourier mode vs. time,
+     with fitted decay rate vs analytic pi^2*nu/H^2.
 
 Usage:
     cd tests/regression/couette
@@ -55,8 +52,11 @@ def main() -> int:
                          help="extra ParmParse overrides, e.g. --override sim.max_step=8000")
     parser.add_argument("--no-run", action="store_true",
                          help="reuse an existing --run-dir instead of rerunning the solver")
-    parser.add_argument("--out", type=Path, default=COUETTE_DIR / "couette3d_decay.png",
-                         help="where to write the plot (default: ./couette3d_decay.png)")
+    parser.add_argument("--lattice", type=str, default=None,
+                         choices=["D3Q15", "D3Q19", "D3Q27"],
+                         help="lbm.lattice_type override (default: from inputs, D3Q19)")
+    parser.add_argument("--out", type=Path, default=None,
+                         help="where to write the plot (default: ./couette3d[_<lattice>]_decay.png)")
     parser.add_argument("--max-profile-err", type=float, default=None,
                          help="if set, exit non-zero when max|u_sim-u_analytic|/U0 "
                               "across all snapshots exceeds this")
@@ -64,6 +64,15 @@ def main() -> int:
                          help="if set, exit non-zero when the fitted decay rate's "
                               "relative error against pi^2*nu/H^2 exceeds this")
     args = parser.parse_args()
+    if args.out is None:
+        suffix = f"_{args.lattice}" if args.lattice else ""
+        args.out = COUETTE_DIR / f"couette3d{suffix}_decay.png"
+    # Use lattice-specific run dir to avoid clobbering when testing multiple lattices
+    if args.lattice and args.run_dir == COUETTE_DIR / "profile_run3d":
+        args.run_dir = COUETTE_DIR / f"profile_run3d_{args.lattice}"
+    # Propagate lattice override to solver via extra --override
+    if args.lattice:
+        args.override = list(args.override) + [f"lbm.lattice_type={args.lattice}"]
 
     solver_exe = find_one("test_couette3d*.ex", COUETTE_DIR)
     faverage_exe = ensure_faverage(dim=3)
@@ -72,16 +81,16 @@ def main() -> int:
     params = apply_overrides(
         {
             "grid.ncells": parse_inputs_values(inputs_text, "grid.ncells"),
-            "bc.hiy_Uwall": parse_inputs_values(inputs_text, "bc.hiy_Uwall"),
+            "bc.hiz_Uwall": parse_inputs_values(inputs_text, "bc.hiz_Uwall"),
             "geometry.prob_lo": parse_inputs_values(inputs_text, "geometry.prob_lo"),
             "geometry.prob_hi": parse_inputs_values(inputs_text, "geometry.prob_hi"),
         },
         args.override,
     )
-    Ny = params["grid.ncells"][1]
-    Uwall0 = params["bc.hiy_Uwall"][0]
-    y_lo, y_hi = params["geometry.prob_lo"][1], params["geometry.prob_hi"][1]
-    domain_height = y_hi - y_lo
+    Nz = int(params["grid.ncells"][2])
+    Uwall0 = params["bc.hiz_Uwall"][0]
+    z_lo, z_hi = params["geometry.prob_lo"][2], params["geometry.prob_hi"][2]
+    domain_height = z_hi - z_lo
 
     if args.no_run:
         log_text = (args.run_dir / "run.log").read_text()
@@ -91,7 +100,7 @@ def main() -> int:
     units = parse_units_log(log_text)
     nu_lat = units["nu_lat"]
     U0 = Uwall0 * units["C_t"] / units["C_x"]
-    H = Ny
+    H = Nz
 
     plt_dirs = sorted(
         (p for p in args.run_dir.glob("plt*") if re.fullmatch(r"plt\d+", p.name)),
@@ -107,18 +116,17 @@ def main() -> int:
         if not analytic_dir.is_dir():
             continue
 
-        y_phys, u_sim = faverage_profile(faverage_exe, pdir, "vx")
+        z_phys, u_sim = faverage_profile(faverage_exe, pdir, "vx")
         _, u_analytic = faverage_profile(faverage_exe, analytic_dir, "vx")
-        if len(y_phys) != Ny:
+        if len(z_phys) != Nz:
             raise RuntimeError(
-                f"faverage returned {len(y_phys)} bins but Ny={Ny}: faverage with DIM=3 "
-                "averages along z (last dimension), not y. For 3-D Couette (y-varying) "
-                "use a y-aware averaging (e.g. yt or custom FAB reader) or change the "
-                "wall normal to z so y becomes the last dimension."
+                f"faverage returned {len(z_phys)} bins but Nz={Nz}: expected wall-normal z "
+                "with DIM=3 (faverage averages along z). Check inputs3d has walls in z "
+                "and faverage was built with DIM=3."
             )
-        y_norm = (y_phys - y_lo) / domain_height
+        z_norm = (z_phys - z_lo) / domain_height
         times.append(step + 1.0)
-        profiles.append((y_norm, u_sim, u_analytic))
+        profiles.append((z_norm, u_sim, u_analytic))
 
     times = np.array(times)
     profile_max_err = max(
@@ -141,22 +149,22 @@ def main() -> int:
 
     for k, idx in enumerate(show_idx):
         t = times[idx]
-        y_norm, u_sim, u_analytic = profiles[idx]
-        order = np.argsort(y_norm)
+        z_norm, u_sim, u_analytic = profiles[idx]
+        order = np.argsort(z_norm)
         color = cmap(k / max(len(show_idx) - 1, 1))
-        ax_profiles.plot(u_sim[order] / U0, y_norm[order], "o", color=color, ms=4,
+        ax_profiles.plot(u_sim[order] / U0, z_norm[order], "o", color=color, ms=4,
                          label=f"t={t:.0f}")
-        ax_profiles.plot(u_analytic[order] / U0, y_norm[order], "-", color=color, lw=1)
+        ax_profiles.plot(u_analytic[order] / U0, z_norm[order], "-", color=color, lw=1)
 
-    ax_profiles.plot([0, 1], [0, 1], "k--", lw=1, label="steady (U0*y/H)")
+    ax_profiles.plot([0, 1], [0, 1], "k--", lw=1, label="steady (U0*z/H)")
     ax_profiles.set_xlabel("u / U0")
-    ax_profiles.set_ylabel("y / H")
-    ax_profiles.set_title("3D Couette startup: profile vs. time")
+    ax_profiles.set_ylabel("z / H")
+    ax_profiles.set_title("3D Couette startup: profile vs. time (z-wall)")
     ax_profiles.legend(fontsize=7, loc="lower right")
 
     log_amps = []
-    for y_norm, u_sim, _ in profiles:
-        a1 = first_mode_amplitude(y_norm, u_sim, U0)
+    for z_norm, u_sim, _ in profiles:
+        a1 = first_mode_amplitude(z_norm, u_sim, U0)
         log_amps.append(np.log(abs(a1)) if abs(a1) > 1e-12 else np.nan)
     log_amps = np.array(log_amps)
 

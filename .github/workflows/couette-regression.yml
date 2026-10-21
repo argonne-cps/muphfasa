@@ -22,10 +22,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  couette:
-    name: Convergence + decay-rate check (2D + 3D)
+  couette-2d:
+    name: 2D D2Q9
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - name: Check out repository (with AMReX submodule)
         uses: actions/checkout@v4
@@ -68,36 +68,90 @@ jobs:
         working-directory: tests/regression/couette
         run: make -j"$(nproc)"
 
-      - name: Build test_couette (3-D)
-        working-directory: tests/regression/couette
-        run: make -j"$(nproc)" DIM=3
-
       - name: Grid-convergence study (2-D)
         working-directory: tests/regression/couette
         run: python3 convergence.py --ny-list 16 32 64 --min-order 2.5
-
-      - name: Grid-convergence study (3-D)
-        working-directory: tests/regression/couette
-        run: python3 convergence3d.py --ny-list 16 32 64 --min-order 2.5
 
       - name: Startup-transient profile + decay-rate check (2-D)
         working-directory: tests/regression/couette
         run: python3 plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01
 
-      - name: Startup-transient profile + decay-rate check (3-D)
+      - name: Upload plots and data
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: couette-2d-results
+          path: |
+            tests/regression/couette/couette_convergence.png
+            tests/regression/couette/couette_convergence.csv
+            tests/regression/couette/couette_decay.png
+          if-no-files-found: ignore
+
+  couette-3d:
+    name: 3D ${{ matrix.lattice }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        lattice: [D3Q15, D3Q19, D3Q27]
+    steps:
+      - name: Check out repository (with AMReX submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: pip install numpy matplotlib
+
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Resolve AMReX submodule commit (cache key)
+        id: amrex
+        run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: couette-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
+          restore-keys: |
+            couette-ccache-${{ runner.os }}-amrex-
+
+      - name: Configure ccache
+        run: |
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
+      - name: Build test_couette (3-D)
         working-directory: tests/regression/couette
-        run: python3 plot_couette3d.py --max-profile-err 0.01 --max-rate-rel-err 0.01
+        run: make -j"$(nproc)" DIM=3
+
+      - name: Grid-convergence study (3-D ${{ matrix.lattice }})
+        working-directory: tests/regression/couette
+        run: python3 convergence3d.py --lattice ${{ matrix.lattice }} --nz-list 16 32 64 --min-order 2.5
+
+      - name: Startup-transient profile + decay-rate check (3-D ${{ matrix.lattice }})
+        working-directory: tests/regression/couette
+        run: python3 plot_couette3d.py --lattice ${{ matrix.lattice }} --max-profile-err 0.01 --max-rate-rel-err 0.01
 
       - name: Upload plots and data
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: couette-regression-results
+          name: couette-3d-${{ matrix.lattice }}-results
           path: |
-            tests/regression/couette/couette_convergence.png
-            tests/regression/couette/couette_convergence.csv
-            tests/regression/couette/couette_decay.png
-            tests/regression/couette/couette3d_convergence.png
-            tests/regression/couette/couette3d_convergence.csv
-            tests/regression/couette/couette3d_decay.png
+            tests/regression/couette/couette3d_${{ matrix.lattice }}_convergence.png
+            tests/regression/couette/couette3d_${{ matrix.lattice }}_convergence.csv
+            tests/regression/couette/couette3d_${{ matrix.lattice }}_decay.png
           if-no-files-found: ignore

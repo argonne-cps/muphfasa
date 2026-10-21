@@ -1,11 +1,12 @@
 # Couette flow regression test
 
-Plane Couette flow: periodic in x (and z in 3D), stationary wall at y=lo, wall moving at
-U0 at y=hi. Checks the simulated velocity profile against the analytic
-time-dependent plane-Couette-startup solution, both during the transient and
-at steady state. See the comment block at the top of `test_couette.cpp` for
-the full derivation. The single source `test_couette.cpp` builds for both
-2D and 3D via `AMREX_SPACEDIM`.
+Plane Couette flow: periodic in x (and y in 3D), stationary wall at y=lo (2D) or
+z=lo (3D) and moving wall at y=hi (2D) or z=hi (3D) at U0. Checks the simulated
+velocity profile against the analytic time-dependent plane-Couette-startup
+solution, both during the transient and at steady state. See the comment block
+at the top of `test_couette.cpp` for the full derivation. The single source
+`test_couette.cpp` builds for both 2D (`WALL_DIM=y`) and 3D (`WALL_DIM=z`, so
+`faverage` with `DIM=3` averaging along z matches the wall normal).
 
 ## Build and run
 
@@ -25,10 +26,12 @@ saves `pltXXXXXXX` and `analytic_pltXXXXXXX` (same `rho`/`vel` layout, `vel` fro
 
 ## Plotting
 
-`plot_couette.py` (2D) and `plot_couette3d.py` (3D) run the solver with the
-base inputs, laterally average `vx` with AMReX's `faverage` to get `vx(y)`, and plot:
+`plot_couette.py` (2D, wall-normal y) and `plot_couette3d.py` (3D, wall-normal z)
+run the solver with the base inputs, laterally average `vx` with AMReX's `faverage`
+to get `vx(y)` in 2D and `vx(z)` in 3D (faverage averages along the last dimension,
+so 3D must vary in z), and plot:
 
-1. Velocity profiles `u/U0` vs. `y/H` at each snapshot -- simulated (markers) vs analytic (lines).
+1. Velocity profiles `u/U0` vs. `y/H` (2D) or `z/H` (3D) at each snapshot -- simulated (markers) vs analytic (lines).
 2. Dominant (n=1) Fourier mode log-amplitude vs. time with fitted decay rate `pi^2*nu/H^2`.
 
 ```sh
@@ -44,7 +47,9 @@ Runs in `profile_run/` (2D) / `profile_run3d/` (3D), log `run.log`. Flags: `--in
 
 ## Convergence study
 
-`convergence.py` (2D) and `convergence3d.py` (3D) run at Ny=16,32,64 and check error shrinks at expected rate. They pin `lbm.tau` (not `Uwall`) so `nu_lat=(tau-0.5)/3` and `Re` stay fixed; all runs stop at same `nu*t/H^2=0.05`.
+`convergence.py` (2D, Ny) and `convergence3d.py` (3D, Nz wall-normal) run at Ny/Nz=16,32,64
+and check error shrinks at expected rate. They pin `lbm.tau` (not `Uwall`) so `nu_lat=(tau-0.5)/3`
+and `Re` stay fixed; all runs stop at same `nu*t/H^2=0.05`.
 
 ```sh
 make DIM=2
@@ -54,12 +59,12 @@ make DIM=3
 python3 convergence3d.py    # fcompare DIM=3, writes couette3d_convergence.csv/.png
 ```
 
-Each resolution in `convergence_runs/Ny<N>/` (2D) / `convergence_runs3d/Ny<N>/` (3D) with `run.log`/`fcompare.log`. Table columns `Ny,dx,target_step,abs_err_vx,order_vx`; order ~2 expected. Flags: `--ny-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`, `--min-order 1.8`, `--plot/--no-plot`. Only `vx` tracked (`vy`/`vz` ~0).
+Each resolution in `convergence_runs/Ny<N>/` (2D) / `convergence_runs3d/Nz<N>/` (3D) with `run.log`/`fcompare.log`. Table columns `Ny/Nz,dx,target_step,abs_err_vx,order_vx`; order ~2 expected. Flags: `--ny-list/--nz-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`, `--min-order 1.8`, `--plot/--no-plot`. Only `vx` tracked (`vy`/`vz` ~0).
 
 ## 3D contribution options
 
-- Lattice: `D3Q19` (default, 19 vel), `D3Q27` (full, more isotropic), `D3Q15` (light). Set `lbm.lattice_type` and `DIM=3`; ensure `grid.ncells` includes `Nz` and BCs have 3 entries (`Periodic NoSlip Periodic`).
-- Extending: add new `D3Qxx` in `LatticeDescriptor.H` (Krueger ordering), update `SimulationFactory`, and add `inputs*` variant. Verify with `convergence3d.py`.
+- Lattice: `D3Q19` (default, 19 vel), `D3Q27` (full, more isotropic), `D3Q15` (light). Set `lbm.lattice_type` and `DIM=3`; ensure `grid.ncells` is `Nx Ny Nz` with `Nz` wall-normal and BCs `Periodic Periodic NoSlip/MovingWall` (x,y periodic, z walls), e.g. `4 4 32`.
+- Extending: add new `D3Qxx` in `LatticeDescriptor.H` (Krueger ordering), update `SimulationFactory`, and add `inputs*` variant. Verify with `convergence3d.py` (`--nz-list`).
 
 ## CI
 
