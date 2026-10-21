@@ -53,29 +53,29 @@ struct BounceBack
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
                     int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0]-bound, iv[1], opp_n) + contrib(n, opp_n, rho, U);
+                    f(iv, n) = f(iv[0]-bound, iv[1], opp_n) + contrib(opp_n, rho, U);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
                     int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1]-bound, opp_n) + contrib(n, opp_n, rho, U);
+                    f(iv, n) = f(iv[0], iv[1]-bound, opp_n) + contrib(opp_n, rho, U);
                 }
             }
 #else
             if (dir == 0) {
                 if (LatticeTag::cx(n) == -bound) {
                     int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], opp_n) + contrib(n, opp_n, rho, U);
+                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], opp_n) + contrib(opp_n, rho, U);
                 }
             } else if (dir == 1) {
                 if (LatticeTag::cy(n) == -bound) {
                     int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], opp_n) + contrib(n, opp_n, rho, U);
+                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], opp_n) + contrib(opp_n, rho, U);
                 }
             } else if (dir == 2) {
                 if (LatticeTag::cz(n) == -bound) {
                     int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, opp_n) + contrib(n, opp_n, rho, U);
+                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, opp_n) + contrib(opp_n, rho, U);
                 }
             }
 #endif
@@ -84,12 +84,12 @@ struct BounceBack
 
     private:
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-    static amrex::Real contrib(int n, int opp_n, amrex::Real rho,
-                                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& U) {
+    static amrex::Real contrib(int opp_n, amrex::Real rho,
+                               amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& U) {
         amrex::Real cdotu = AMREX_D_TERM(LatticeTag::cx(opp_n) * U[0],
                                         + LatticeTag::cy(opp_n) * U[1],
                                         + LatticeTag::cz(opp_n) * U[2]);
-        return -2. * rho * LatticeTag::weights(n) * cdotu * LatticeTag::cs2inv;
+        return -2. * rho * LatticeTag::weights(opp_n) * cdotu * LatticeTag::cs2inv;
     }
 };
 
