@@ -62,6 +62,7 @@ struct LatticeDescriptor<2, 9>
 };
 
 // ── D3Q15 ─────────────────────────────────────────────────────────────────
+// Krueger Table 3.4 — D3Q15 velocity set in explicit form
 //   q:  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14
 // (cx): 0   1  -1   0   0   0   0   1  -1   1  -1   1  -1  -1   1
 // (cy): 0   0   0   1  -1   0   0   1  -1   1  -1  -1   1   1  -1
@@ -102,10 +103,10 @@ struct LatticeDescriptor<3, 15>
             amrex::Real(1.0/9.0),  amrex::Real(1.0/9.0),  // q=1,2: ±x
             amrex::Real(1.0/9.0),  amrex::Real(1.0/9.0),  // q=3,4: ±y
             amrex::Real(1.0/9.0),  amrex::Real(1.0/9.0),  // q=5,6: ±z
-            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=7,8: (1,1,1), (-1,-1,-1)
-            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=9,10: (1,1,-1), (-1,-1,1)
-            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=11,12: (1,-1,1), (-1,1,-1)
-            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0)  // q=13,14: (-1,1,1), (1,-1,-1)
+            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=7,8: (-1,-1,-1), (1,1,1)
+            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=9,10: (-1,-1,1), (1,1,-1)
+            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0), // q=11,12: (-1,1,-1), (1,-1,1)
+            amrex::Real(1.0/72.0), amrex::Real(1.0/72.0)  // q=13,14: (1,-1,-1), (-1,1,1)
         };
         return d[q];
     }
@@ -119,11 +120,12 @@ struct LatticeDescriptor<3, 15>
 };
 
 // ── D3Q19 ─────────────────────────────────────────────────────────────────
+// Krueger Table 3.5 — D3Q19 velocity set in explicit form
 //   q:  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16  17  18
-// (cx): 0   1  -1   0   0   0   0   1  -1   1  -1   0   0   0   0   1  -1   1  -1
-// (cy): 0   0   0   1  -1   0   0   1  -1   0   0   1  -1   1  -1   0   0   0   0
-// (cz): 0   0   0   0   0   1  -1   0   0   1  -1   1  -1  -1   1   1  -1  -1   1
-//  Velocities: 1 rest, 6 face (±1,0,0),(0,±1,0),(0,0,±1), 12 edge (±1,±1,0),(±1,0,±1),(0,±1,±1)
+// (cx): 0   1  -1   0   0   0   0   1  -1   1  -1   0   0   1  -1   1  -1   0   0
+// (cy): 0   0   0   1  -1   0   0   1  -1   0   0   1  -1  -1   1   0   0   1  -1
+// (cz): 0   0   0   0   0   1  -1   0   0   1  -1   1  -1   0   0  -1   1  -1   1
+//  Velocities: 1 rest, 6 face (±1,0,0),(0,±1,0),(0,0,±1), 12 edge (all permutations)
 //  Weights: w0=1/3, w1-6=1/18, w7-18=1/36
 template <>
 struct LatticeDescriptor<3, 19>
@@ -136,19 +138,19 @@ struct LatticeDescriptor<3, 19>
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cx(int q) noexcept {
-        constexpr int d[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1 };
+        constexpr int d[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0 };
         return d[q];
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cy(int q) noexcept {
-        constexpr int d[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, 0, 0 };
+        constexpr int d[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1 };
         return d[q];
     }
 
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static constexpr int cz(int q) noexcept {
-        constexpr int d[19] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, -1, 1, 1, -1, -1, 1 };
+        constexpr int d[19] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1 };
         return d[q];
     }
 
@@ -159,12 +161,12 @@ struct LatticeDescriptor<3, 19>
             amrex::Real(1.0/18.0), amrex::Real(1.0/18.0), // q=1,2: ±x
             amrex::Real(1.0/18.0), amrex::Real(1.0/18.0), // q=3,4: ±y
             amrex::Real(1.0/18.0), amrex::Real(1.0/18.0), // q=5,6: ±z
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=7,8: (1,1,0), (-1,-1,0)
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=9,10: (1,-1,0), (-1,1,0)
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=11,12: (0,1,1), (0,-1,-1)
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=13,14: (0,1,-1), (0,-1,1)
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=15,16: (1,0,1), (-1,0,-1)
-            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0)  // q=17,18: (1,0,-1), (-1,0,1)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=7,8: (-1,-1,0), (1,1,0)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=9,10: (-1,0,-1), (1,0,1)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=11,12: (0,-1,-1), (0,1,1)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=13,14: (-1,1,0), (1,-1,0)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0), // q=15,16: (-1,0,1), (1,0,-1)
+            amrex::Real(1.0/36.0), amrex::Real(1.0/36.0)  // q=17,18: (0,-1,1), (0,1,-1)
         };
         return d[q];
     }
@@ -178,11 +180,11 @@ struct LatticeDescriptor<3, 19>
 };
 
 // ── D3Q27 ─────────────────────────────────────────────────────────────────
-// Krueger Table 3.6 ordering (C1 = -1):
+// Krueger Table 3.6 — D3Q27 velocity set in explicit form
 // i:     0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26
-// cix:   0 -1  1  0  0  0  0 -1  1 -1  1  0  0 -1  1 -1  1  0  0 -1  1 -1  1 -1  1  1 -1
-// ciy:   0  0  0 -1  1  0  0 -1  1  0  0 -1  1  1 -1  0  0 -1  1  1  1  1  1 -1 -1  1
-// ciz:   0  0  0  0  0 -1  1  0  0 -1  1 -1  1  0  0  1 -1  1  1  1  1 -1 -1  1 -1  1
+// cix:   0  1 -1  0  0  0  0  1 -1  1 -1  0  0  1 -1  1 -1  0  0  1 -1  1 -1  1 -1 -1  1
+// ciy:   0  0  0  1 -1  0  0  1 -1  0  0  1 -1 -1  1  0  0  1 -1  1 -1  1 -1 -1  1  1 -1
+// ciz:   0  0  0  0  0  1 -1  0  0  1 -1  1 -1  0  0 -1  1 -1  1  1 -1 -1  1  1 -1  1 -1
 //  Velocities: 1 rest, 6 face (±x,±y,±z), 12 edge, 8 corners (full 3x3x3 cube)
 //  Weights: w0=8/27, w1-6=2/27, w7-18=1/54, w19-26=1/216
 template <>
@@ -198,9 +200,9 @@ struct LatticeDescriptor<3, 27>
     static constexpr int cx(int q) noexcept {
         constexpr int d[27] = {
             0,                                  // q=0: rest
-            -1, 1, 0, 0, 0, 0,                  // q=1-6: face (-x,+x,-y,+y,-z,+z)
-            -1, 1, -1, 1, 0, 0, 0, 0, -1, 1, -1, 1,  // q=7-18: edge
-            -1, 1, -1, 1, -1, 1, 1, -1          // q=19-26: corners
+            1, -1, 0, 0, 0, 0,                  // q=1-6: face (+x,-x,+y,-y,+z,-z)
+            1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0,  // q=7-18: edge
+            1, -1, 1, -1, 1, -1, -1, 1          // q=19-26: corners
         };
         return d[q];
     }
@@ -209,9 +211,9 @@ struct LatticeDescriptor<3, 27>
     static constexpr int cy(int q) noexcept {
         constexpr int d[27] = {
             0,                                  // q=0: rest
-            0, 0, -1, 1, 0, 0,                  // q=1-6: face
-            -1, 1, 0, 0, -1, 1, 1, -1, 0, 0, 0, 0,  // q=7-18: edge
-            1, 1, 1, 1, -1, -1, -1, 1           // q=19-26: corners
+            0, 0, 1, -1, 0, 0,                  // q=1-6: face
+            1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1,  // q=7-18: edge
+            1, -1, 1, -1, -1, 1, 1, -1           // q=19-26: corners
         };
         return d[q];
     }
@@ -220,9 +222,9 @@ struct LatticeDescriptor<3, 27>
     static constexpr int cz(int q) noexcept {
         constexpr int d[27] = {
             0,                                  // q=0: rest
-            0, 0, 0, 0, -1, 1,                  // q=1-6: face
-            0, 0, -1, 1, -1, 1, 1, -1, 1, -1, -1, 1,  // q=7-18: edge
-            -1, -1, 1, -1, 1, 1, -1, 1          // q=19-26: corners
+            0, 0, 0, 0, 1, -1,                  // q=1-6: face
+            0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1,  // q=7-18: edge
+            1, -1, -1, 1, 1, -1, 1, -1          // q=19-26: corners
         };
         return d[q];
     }
@@ -234,16 +236,16 @@ struct LatticeDescriptor<3, 27>
             amrex::Real(2.0/27.0), amrex::Real(2.0/27.0), // q=1,2: -x,+x
             amrex::Real(2.0/27.0), amrex::Real(2.0/27.0), // q=3,4: -y,+y
             amrex::Real(2.0/27.0), amrex::Real(2.0/27.0), // q=5,6: -z,+z
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=7,8: (-1,-1,0), (1,1,0)
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=9,10: (-1,0,-1), (1,0,1)
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=11,12: (0,-1,-1), (0,1,1)
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=13,14: (-1,1,0), (1,-1,0)
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=15,16: (-1,0,1), (1,0,-1)
-            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=17,18: (0,-1,1), (0,1,-1)
-            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=19,20: (-1,-1,-1), (1,1,-1)
-            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=21,22: (-1,1,-1), (1,-1,-1)
-            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=23,24: (1,1,1), (-1,-1,1)
-            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0)  // q=25,26: (1,-1,1), (-1,1,1)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=7,8: (1,1,0), (-1,-1,0)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=9,10: (1,0,1), (-1,0,-1)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=11,12: (0,1,1), (0,-1,-1)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=13,14: (1,-1,0), (-1,1,0)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=15,16: (1,0,-1), (-1,0,1)
+            amrex::Real(1.0/54.0), amrex::Real(1.0/54.0), // q=17,18: (0,1,-1), (0,-1,1)
+            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=19,20: (1,1,1), (-1,-1,-1)
+            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=21,22: (1,1,-1), (-1,-1,1)
+            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0), // q=23,24: (1,-1,1), (-1,1,-1)
+            amrex::Real(1.0/216.0), amrex::Real(1.0/216.0)  // q=25,26: (-1,1,1), (1,-1,-1)
         };
         return d[q];
     }
@@ -254,7 +256,7 @@ struct LatticeDescriptor<3, 27>
         constexpr int d[27] = {
             0,  2,  1,  4,  3,  6,  5,  // q=0-6: rest, (-x↔+x), (-y↔+y), (-z↔+z)
             8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17,  // q=7-18: edge opposites
-            23, 24, 25, 26, 19, 20, 21, 22                   // q=19-26: corner opposites
+            20, 19, 22, 21, 24, 23, 26, 25                   // q=19-26: corner opposites
         };
         return d[q];
     }
