@@ -1,116 +1,221 @@
 #!/usr/bin/env python3
-"""plot_tgv2d.py — Visualize the 2-D Taylor-Green vortex regression test.
+"""plot_tgv2d.py — Run the 2-D Taylor-Green vortex test and plot its decay.
 
-Reads the two CSVs written by test_tgv2d.cpp:
-  tgv2d_convergence.csv — (N, dx, L2 velocity error) at three resolutions,
-                          holding tau fixed and keeping one vortex
-                          wavelength per domain (diffusive-scaling
-                          refinement). Rendered as a log-log plot against
-                          a reference dx^2 line -> tgv2d_convergence.png.
-  tgv2d_snapshots.csv   — the velocity field at a single resolution (N=64)
-                          sampled periodically as it decays. Rendered as a
-                          row of vorticity-contour snapshots over time ->
-                          tgv2d_decay.png.
+End-to-end driver (same style as tests/regression/couette/plot_couette.py):
+runs test_tgv2d with the base `inputs` file (writing plt<step> snapshots as
+it already does) and reads the full 2-D density/velocity fields straight
+from the solver's own plotfiles with yt (TGV's doubly-periodic field can't
+be laterally averaged the way plot_couette.py averages the Couette profile
+-- that would erase the vortex signal entirely, so this reads the full
+field instead). Renders two figures:
+  1. tgv2d_decay.png   — a row of vorticity heatmaps at several snapshot
+                         times, visually demonstrating the vortex decaying.
+  2. tgv2d_rate.png    — max|u|(t) vs. the analytic envelope
+                         u0*exp(-2*nu*k^2*t), log scale, with a fitted decay
+                         rate compared to the analytic one.
 
 Usage:
     cd tests/regression/tgv2d
-    <build & run test_tgv2d so the CSVs exist>
-    python3 plot_tgv2d.py
+    make                     # build test_tgv2d2d.gnu.ex, if not already
+    python3 plot_tgv2d.py    # runs the solver, then plots
 
-Requires numpy + matplotlib (see tests/regression/couette/plot_couette.py
-for how to set up a venv with both if the system Python doesn't have them).
+Requires numpy + matplotlib + yt (`pip install yt`).
 """
 
-import csv
+import argparse
+import math
+import re
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
+import yt
+
+yt.set_log_level(40)  # suppress yt's per-dataset INFO banner
+
+TGV_DIR = Path(__file__).resolve().parent
 
 
-def plot_convergence():
-    with open("tgv2d_convergence.csv") as f:
-        f.readline()  # header comment line (tau/nu/U0), not needed here
-        reader = csv.DictReader(f)
-        rows = [(int(r["N"]), float(r["dx"]), float(r["error"])) for r in reader]
-
-    N, dx, err = (np.array(x) for x in zip(*rows))
-
-    fig, ax = plt.subplots(figsize=(5, 4.5))
-    ax.loglog(dx, err, "o-", label="measured L2 error")
-
-    # Reference 2nd-order line through the first data point.
-    ref = err[0] * (dx / dx[0]) ** 2
-    ax.loglog(dx, ref, "k--", label="O(dx^2) reference")
-
-    orders = np.log(err[:-1] / err[1:]) / np.log(dx[:-1] / dx[1:])
-    title = "TGV2D convergence: observed order " + ", ".join(f"{o:.2f}" for o in orders)
-    ax.set_xlabel("dx (= 1/N)")
-    ax.set_ylabel("L2 velocity error")
-    ax.set_title(title, fontsize=10)
-    ax.invert_xaxis()
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig("tgv2d_convergence.png", dpi=150)
-    print("Wrote tgv2d_convergence.png")
+def find_one(pattern: str, directory: Path) -> Path:
+    matches = sorted(Path(directory).glob(pattern))
+    if not matches:
+        raise FileNotFoundError(f"no file matching {pattern!r} in {directory}")
+    return matches[0]
 
 
-def plot_decay():
-    with open("tgv2d_snapshots.csv") as f:
-        header = f.readline()
-        reader = csv.DictReader(f)
-        rows = [
-            (float(r["time"]), int(r["i"]), int(r["j"]), float(r["u_sim"]), float(r["v_sim"]))
-            for r in reader
-        ]
+def parse_inputs_value(text: str, key: str) -> list:
+    m = re.search(rf"^\s*{re.escape(key)}\s*=\s*([^\n#]+)", text, re.MULTILINE)
+    if not m:
+        raise ValueError(f"could not find {key!r} in inputs")
+    return m.group(1).split()
 
-    params = {}
-    for tok in header.lstrip("#").split():
-        key, val = tok.split("=")
-        params[key] = val
-    N = int(params["N"])
 
-    data = np.array(rows)
-    times = np.unique(data[:, 0])
+UNITS_LOG_RE = re.compile(r"^nu_lat:\s*([-+0-9.eE]+)", re.MULTILINE)
 
-    def vorticity(t):
-        rows_t = data[data[:, 0] == t]
-        u = np.zeros((N, N))
-        v = np.zeros((N, N))
-        for _, i, j, ui, vi in rows_t:
-            u[int(j), int(i)] = ui
-            v[int(j), int(i)] = vi
-        # omega_z = dv/dx - du/dy, central differences, periodic.
-        dvdx = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / 2.0
-        dudy = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / 2.0
-        return dvdx - dudy
 
-    n_show = min(len(times), 6)
-    show_idx = np.linspace(0, len(times) - 1, n_show).round().astype(int)
-    vorts = [vorticity(times[idx]) for idx in show_idx]
+def parse_nu_lat(log_text: str) -> float:
+    """Pull nu_lat straight from UnitConverter's own startup banner (see
+    src/LBM/Units.cpp), consistent with how plot_couette.py reads it."""
+    m = UNITS_LOG_RE.search(log_text)
+    if not m:
+        raise ValueError("could not find 'nu_lat:' in solver log")
+    return float(m.group(1))
 
-    # Shared color scale across all panels, set by the initial (largest
-    # magnitude) field -- otherwise each panel autoscales to its own max
-    # and the decay becomes invisible.
+
+def run_solver(solver_exe: Path, inputs_path: Path, run_dir: Path, overrides: list) -> str:
+    if run_dir.exists():
+        shutil.rmtree(run_dir)
+    run_dir.mkdir(parents=True)
+
+    log_path = run_dir / "run.log"
+    with open(log_path, "w") as log_file:
+        subprocess.run(
+            [str(solver_exe), str(inputs_path), *overrides],
+            cwd=run_dir,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            check=True,
+        )
+    return log_path.read_text()
+
+
+def vorticity(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """omega_z = dv/dx - du/dy, central differences, periodic domain."""
+    dvdx = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / 2.0
+    dudy = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / 2.0
+    return dvdx - dudy
+
+
+def read_plotfile_2d(pltdir: Path):
+    """Read a 2-D single-level AMReX plotfile via yt, returning
+    ({"density"/"vx"/"vy": 2-D array indexed [j, i]}, current_time)."""
+    ds = yt.load(str(pltdir))
+    dims = ds.domain_dimensions
+    grid = ds.covering_grid(level=0, left_edge=ds.domain_left_edge, dims=dims)
+    fields = {
+        name: np.asarray(grid["boxlib", name])[:, :, 0].T
+        for name in ("density", "vx", "vy")
+    }
+    return fields, float(ds.current_time)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--inputs", type=Path, default=TGV_DIR / "inputs",
+                         help="inputs file to run (default: ./inputs)")
+    parser.add_argument("--run-dir", type=Path, default=TGV_DIR / "profile_run",
+                         help="scratch directory for the solver run (default: ./profile_run)")
+    parser.add_argument("--override", nargs="*", default=[],
+                         help="extra ParmParse overrides, e.g. --override sim.max_step=4000")
+    parser.add_argument("--no-run", action="store_true",
+                         help="reuse an existing --run-dir instead of rerunning the solver")
+    parser.add_argument("--decay-out", type=Path, default=TGV_DIR / "tgv2d_decay.png",
+                         help="where to write the vorticity-decay heatmaps")
+    parser.add_argument("--rate-out", type=Path, default=TGV_DIR / "tgv2d_rate.png",
+                         help="where to write the decay-rate plot")
+    parser.add_argument("--n-panels", type=int, default=6,
+                         help="number of heatmap snapshots to show (default: 6)")
+    parser.add_argument("--max-rate-rel-err", type=float, default=None,
+                         help="if set, exit non-zero when the fitted decay rate's "
+                              "relative error against u0*exp(-2*nu*k^2*t) exceeds this")
+    args = parser.parse_args()
+
+    solver_exe = find_one("test_tgv2d*.ex", TGV_DIR)
+
+    inputs_text = args.inputs.read_text()
+    n = int(parse_inputs_value(inputs_text, "grid.ncells")[0])
+    u0 = float(parse_inputs_value(inputs_text, "units.ref_velocity")[0])
+    k = 2.0 * math.pi / n
+
+    if args.no_run:
+        log_text = (args.run_dir / "run.log").read_text()
+    else:
+        log_text = run_solver(solver_exe, args.inputs.resolve(), args.run_dir, args.override)
+
+    nu_lat = parse_nu_lat(log_text)
+
+    plt_dirs = sorted(
+        (p for p in args.run_dir.glob("plt*") if re.fullmatch(r"plt\d+", p.name)),
+        key=lambda p: int(p.name[3:]),
+    )
+    if not plt_dirs:
+        raise FileNotFoundError(f"no plt<step> directories found in {args.run_dir}")
+
+    times, fields = [], []
+    for pdir in plt_dirs:
+        f, t = read_plotfile_2d(pdir)
+        times.append(t)
+        fields.append(f)
+    times = np.array(times)
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    # ── Figure 1: vorticity-decay heatmaps ──────────────────────────────
+    n_show = min(len(times), args.n_panels)
+    show_idx = np.unique(np.round(np.linspace(0, len(times) - 1, n_show)).astype(int))
+    vorts = [vorticity(fields[i]["vx"], fields[i]["vy"]) for i in show_idx]
     vmax = max(abs(v).max() for v in vorts)
 
-    fig, axes = plt.subplots(1, n_show, figsize=(3 * n_show, 3.2), sharex=True, sharey=True)
-    for ax, idx, vort in zip(axes, show_idx, vorts):
-        t = times[idx]
+    fig, axes = plt.subplots(1, len(show_idx), figsize=(3 * len(show_idx), 3.2),
+                             sharex=True, sharey=True)
+    if len(show_idx) == 1:
+        axes = [axes]
+    for ax, i, vort in zip(axes, show_idx, vorts):
         im = ax.imshow(vort, origin="lower", cmap="RdBu_r", vmin=-vmax, vmax=vmax)
-        ax.set_title(f"t={t:.0f}")
+        ax.set_title(f"t={times[i]:.0f}")
         ax.set_xticks([])
         ax.set_yticks([])
-
     fig.colorbar(im, ax=axes, shrink=0.8, label="vorticity")
     fig.suptitle("2D Taylor-Green vortex: vorticity decay")
-    fig.savefig("tgv2d_decay.png", dpi=150)
-    print("Wrote tgv2d_decay.png")
+    fig.savefig(args.decay_out, dpi=150)
+    print(f"Wrote {args.decay_out}")
 
+    # ── Figure 2: speed-decay rate vs. analytic envelope ────────────────
+    max_speed = np.array([
+        np.sqrt(f["vx"] ** 2 + f["vy"] ** 2).max() for f in fields
+    ])
+    analytic_rate = -2.0 * nu_lat * k * k
 
-def main():
-    plot_convergence()
-    plot_decay()
+    fig2, ax2 = plt.subplots(figsize=(5, 4.5))
+    ax2.semilogy(times, max_speed, "o", ms=4, label="simulation: max|u|")
+    ax2.semilogy(times, u0 * np.exp(analytic_rate * times), "k--",
+                label="analytic: u0*exp(-2*nu*k^2*t)")
+
+    valid = max_speed > 0
+    rate_rel_err = None
+    if valid.sum() >= 2:
+        slope, intercept = np.polyfit(times[valid], np.log(max_speed[valid]), 1)
+        rate_rel_err = abs(slope - analytic_rate) / abs(analytic_rate)
+        title = f"fit rate={slope:.4e}  analytic={analytic_rate:.4e}  (rel.err={rate_rel_err:.2e})"
+    else:
+        title = f"analytic rate={analytic_rate:.4e} (too few points to fit)"
+
+    ax2.set_xlabel("t")
+    ax2.set_ylabel("max|u|")
+    ax2.set_title(title, fontsize=9)
+    ax2.legend()
+    fig2.tight_layout()
+    fig2.savefig(args.rate_out, dpi=150)
+    print(f"Wrote {args.rate_out}")
+
+    if rate_rel_err is not None:
+        print(f"decay rate relative error vs analytic: {rate_rel_err:.3e}")
+
+    ok = True
+    if args.max_rate_rel_err is not None:
+        if rate_rel_err is None:
+            print("FAIL: --max-rate-rel-err given but too few points to fit a decay rate")
+            ok = False
+        elif rate_rel_err > args.max_rate_rel_err:
+            print(f"FAIL: decay rate relative error {rate_rel_err:.3e} > "
+                  f"--max-rate-rel-err {args.max_rate_rel_err}")
+            ok = False
+
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

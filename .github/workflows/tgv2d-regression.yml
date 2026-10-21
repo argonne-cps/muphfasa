@@ -1,0 +1,90 @@
+name: TGV2D regression
+
+# Builds the 2-D Taylor-Green vortex regression test and checks its
+# grid-convergence order of accuracy (vx/vy vs. analytic) via convergence.py.
+# plot_tgv2d.py (decay-rate fit, requires yt) is not run in CI -- see
+# tests/regression/tgv2d/README.md for what each script does.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/regression/tgv2d/**'
+      - 'external/amrex'
+      - '.github/workflows/tgv2d-regression.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/regression/tgv2d/**'
+      - 'external/amrex'
+      - '.github/workflows/tgv2d-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  tgv2d:
+    name: Convergence check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository (with AMReX submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: pip install numpy matplotlib
+
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Resolve AMReX submodule commit (cache key)
+        id: amrex
+        run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # AMReX itself rarely changes; caching its compiled objects via ccache
+      # is what keeps this job fast after the first run on a given submodule
+      # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: tgv2d-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
+          restore-keys: |
+            tgv2d-ccache-${{ runner.os }}-amrex-
+
+      - name: Configure ccache
+        run: |
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
+      - name: Build test_tgv2d (2-D)
+        working-directory: tests/regression/tgv2d
+        run: make -j"$(nproc)"
+
+      - name: Grid-convergence study
+        working-directory: tests/regression/tgv2d
+        # Observed order is ~1.55-1.95 locally (2nd-order LBM accuracy, with
+        # some noise at the finest resolution); --min-order leaves margin for
+        # compiler/platform noise while still catching a real regression
+        # (e.g. a dropped-to-1st-order collision/streaming bug).
+        run: python3 convergence.py --n-list 16 32 64 --min-order 1.7
+
+      - name: Upload plots and data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tgv2d-regression-results
+          path: |
+            tests/regression/tgv2d/tgv2d_convergence.png
+            tests/regression/tgv2d/tgv2d_convergence.csv
+          if-no-files-found: ignore
