@@ -1,9 +1,8 @@
 name: Couette regression
 
 # Builds the plane-Couette regression test and checks:
-#   1. convergence.py: grid-convergence order of accuracy (vx vs. analytic)
-#   2. plot_couette.py: startup-transient profile error and n=1 Fourier
-#      mode decay rate vs. the analytic pi^2*nu/H^2 rate
+#   1. convergence.py / convergence3d.py: grid-convergence order (vx vs analytic)
+#   2. plot_couette.py / plot_couette3d.py: startup-transient profile and n=1 decay rate
 # See tests/regression/couette/README.md for what each script does.
 
 on:
@@ -24,9 +23,9 @@ on:
 
 jobs:
   couette:
-    name: Convergence + decay-rate check
+    name: Convergence + decay-rate check (2D + 3D)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out repository (with AMReX submodule)
         uses: actions/checkout@v4
@@ -51,9 +50,6 @@ jobs:
         id: amrex
         run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      # AMReX itself rarely changes; caching its compiled objects via ccache
-      # is what keeps this job fast after the first run on a given submodule
-      # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -72,21 +68,28 @@ jobs:
         working-directory: tests/regression/couette
         run: make -j"$(nproc)"
 
-      - name: Grid-convergence study
+      - name: Build test_couette (3-D)
         working-directory: tests/regression/couette
-        # Observed order is ~3.0 locally (see README for why); --min-order
-        # leaves margin for compiler/platform noise while still catching a
-        # real regression (e.g. a dropped-to-1st-order BC bug).
+        run: make -j"$(nproc)" DIM=3
+
+      - name: Grid-convergence study (2-D)
+        working-directory: tests/regression/couette
         run: python3 convergence.py --ny-list 16 32 64 --min-order 2.5
 
-      - name: Startup-transient profile + decay-rate check
+      - name: Grid-convergence study (3-D)
         working-directory: tests/regression/couette
-        # Observed values locally are ~3e-3 and ~5e-4 respectively; these
-        # thresholds leave an order of magnitude of margin.
+        run: python3 convergence3d.py --ny-list 16 32 64 --min-order 2.5
+
+      - name: Startup-transient profile + decay-rate check (2-D)
+        working-directory: tests/regression/couette
         run: python3 plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01
 
+      - name: Startup-transient profile + decay-rate check (3-D)
+        working-directory: tests/regression/couette
+        run: python3 plot_couette3d.py --max-profile-err 0.01 --max-rate-rel-err 0.01
+
       - name: Upload plots and data
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: couette-regression-results
@@ -94,4 +97,7 @@ jobs:
             tests/regression/couette/couette_convergence.png
             tests/regression/couette/couette_convergence.csv
             tests/regression/couette/couette_decay.png
+            tests/regression/couette/couette3d_convergence.png
+            tests/regression/couette/couette3d_convergence.csv
+            tests/regression/couette/couette3d_decay.png
           if-no-files-found: ignore
