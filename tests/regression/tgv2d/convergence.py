@@ -30,6 +30,7 @@ import glob
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -40,6 +41,7 @@ TGV_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TGV_DIR.parents[2]
 AMREX_HOME = Path(os.environ.get("AMREX_HOME", REPO_ROOT / "external" / "amrex"))
 PLOTFILE_TOOLS_DIR = AMREX_HOME / "Tools" / "Plotfile"
+SHARED_TOOLS_DIR = REPO_ROOT / ".cache" / "amrex_plotfile_tools"
 
 
 def find_one(pattern: str, directory: Path) -> Path:
@@ -49,18 +51,74 @@ def find_one(pattern: str, directory: Path) -> Path:
     return matches[0]
 
 
-def ensure_fcompare() -> Path:
-    existing = sorted(PLOTFILE_TOOLS_DIR.glob("fcompare*.ex"))
-    if existing:
-        return existing[0]
+def _cached_tool_path(tool: str, dim: int) -> Path:
+    return SHARED_TOOLS_DIR / f"{tool}{dim}d.gnu.ex"
 
-    print("fcompare binary not found -- building it (DIM=2, one-time)...")
+
+def _verify_fcompare_dim(exe: Path, expected_dim: int):
+    cfg = PLOTFILE_TOOLS_DIR / "tmp_build_dir" / "s" / f"{expected_dim}d.gnu.EXE" / "AMReX_Config.H"
+    if cfg.is_file():
+        txt = cfg.read_text()
+        if f"#define AMREX_SPACEDIM {expected_dim}" not in txt:
+            raise RuntimeError(f"fcompare DIM check failed: {cfg} does not contain AMREX_SPACEDIM {expected_dim}")
+        return
+    try:
+        out = subprocess.run(["strings", str(exe)], capture_output=True, text=True, timeout=5).stdout
+        if f"AMREX_SPACEDIM {expected_dim}" not in out and f"BL_SPACEDIM {expected_dim}" not in out:
+            other = 3 if expected_dim == 2 else 2
+            if f"AMREX_SPACEDIM {other}" in out or f"BL_SPACEDIM {other}" in out:
+                raise RuntimeError(f"fcompare {exe} appears to be DIM={other}, expected DIM={expected_dim}")
+            print(f"Warning: could not verify fcompare DIM={expected_dim} via strings; assuming build is correct")
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
+
+
+def ensure_fcompare(dim: int = 2) -> Path:
+    """Build-once, cache with DIM suffix; reuse cached copy on subsequent runs."""
+    cached = _cached_tool_path("fcompare", dim)
+    if cached.is_file():
+        try:
+            _verify_fcompare_dim(cached, dim)
+            return cached
+        except Exception as e:
+            print(f"Cached fcompare {cached} failed verification ({e}), rebuilding...")
+            try:
+                cached.unlink()
+            except FileNotFoundError:
+                pass
+    # Also check for legacy uncached build in place (migration path)
+    legacy = sorted(PLOTFILE_TOOLS_DIR.glob("fcompare*.ex"))
+    if legacy:
+        try:
+            _verify_fcompare_dim(legacy[0], dim)
+            SHARED_TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(legacy[0], cached)
+            try:
+                cached.chmod(0o755)
+            except Exception:
+                pass
+            return cached
+        except Exception:
+            pass
+    print(f"Building fcompare (DIM={dim})...")
     subprocess.run(
-        ["make", "DIM=2", "programs=fcompare"],
+        ["make", f"DIM={dim}", "programs=fcompare"],
         cwd=PLOTFILE_TOOLS_DIR,
         check=True,
     )
-    return find_one("fcompare*.ex", PLOTFILE_TOOLS_DIR)
+    built = find_one("fcompare*.ex", PLOTFILE_TOOLS_DIR)
+    _verify_fcompare_dim(built, dim)
+    SHARED_TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    import shutil
+    shutil.copy2(built, cached)
+    try:
+        cached.chmod(0o755)
+    except Exception:
+        pass
+    return cached
 
 
 FCOMPARE_ROW_RE = re.compile(

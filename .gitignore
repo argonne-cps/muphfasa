@@ -1,6 +1,8 @@
 build/
 tmp_build_dir/
 .venv/
+.cache/
+tools/
 tests/regression/*/*.csv
 tests/regression/*/*.png
 tests/regression/*/Backtrace.*

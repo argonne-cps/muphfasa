@@ -5,9 +5,12 @@ plot_couette3d.py) build and compare 2-D/3-D Couette runs via the same
 AMReX plotfile tools. This module centralises the duplicated logic so the
 drivers stay thin.
 
-fcompare/faverage are dimension-dependent but share a single filename
-(fcompare.gnu.ex, faverage.gnu.ex) for every DIM, so every helper below
-deletes any stale binary and rebuilds for the requested DIM before use.
+fcompare/faverage are dimension-dependent but upstream AMReX always builds
+them as fcompare.gnu.ex / faverage.gnu.ex (no DIM suffix).  Previously every
+helper deleted and rebuilt the binary for the requested DIM.  Now we build
+once per DIM, copy the result to a shared cache (``.cache/amrex_plotfile_tools/
+fcompare2d.gnu.ex`` etc.) and reuse it — subsequent jobs just return the
+cached copy, rebuilding only if it is missing or fails verification.
 """
 
 import os
@@ -25,6 +28,9 @@ COUETTE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = COUETTE_DIR.parents[2]
 AMREX_HOME = Path(os.environ.get("AMREX_HOME", REPO_ROOT / "external" / "amrex"))
 PLOTFILE_TOOLS_DIR = AMREX_HOME / "Tools" / "Plotfile"
+# Shared cache for dimension-suffixed copies: .cache/amrex_plotfile_tools/fcompare2d.gnu.ex etc.
+# This survives across regression runs and avoids recompiling AMReX Tools every invocation.
+SHARED_TOOLS_DIR = REPO_ROOT / ".cache" / "amrex_plotfile_tools"
 
 FCOMPARE_ROW_RE = re.compile(r"^\s*(\S+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s*$")
 
@@ -42,47 +48,106 @@ def find_one(pattern: str, directory: Path) -> Path:
     return matches[0]
 
 
+def _cached_tool_path(tool: str, dim: int) -> Path:
+    """Dimension-suffixed cached path: .cache/amrex_plotfile_tools/fcompare2d.gnu.ex"""
+    return SHARED_TOOLS_DIR / f"{tool}{dim}d.gnu.ex"
+
+
 def ensure_fcompare(dim: int = 2) -> Path:
-    for p in sorted(PLOTFILE_TOOLS_DIR.glob("fcompare*.ex")):
+    cached = _cached_tool_path("fcompare", dim)
+    if cached.is_file():
+        # Quick verify via strings if possible; if it fails, rebuild.
         try:
-            p.unlink()
-        except FileNotFoundError:
-            pass
+            _verify_fcompare_dim(cached, dim)
+            return cached
+        except Exception as e:
+            print(f"Cached fcompare {cached} failed verification ({e}), rebuilding...")
+            try:
+                cached.unlink()
+            except FileNotFoundError:
+                pass
     print(f"Building fcompare (DIM={dim})...")
     subprocess.run(["make", f"DIM={dim}", "programs=fcompare"], cwd=PLOTFILE_TOOLS_DIR, check=True)
-    exes = sorted(PLOTFILE_TOOLS_DIR.glob("fcompare*.ex"))
-    if exes:
-        return exes[0]
-    return find_one("fcompare*.ex", PLOTFILE_TOOLS_DIR)
+    built = find_one("fcompare*.ex", PLOTFILE_TOOLS_DIR)
+    # Verify built binary matches DIM before caching
+    _verify_fcompare_dim(built, dim)
+    SHARED_TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(built, cached)
+    try:
+        cached.chmod(0o755)
+    except Exception:
+        pass
+    return cached
 
 
 def ensure_faverage(dim: int = 2) -> Path:
-    for p in sorted(PLOTFILE_TOOLS_DIR.glob("faverage*.ex")):
+    cached = _cached_tool_path("faverage", dim)
+    if cached.is_file():
         try:
-            p.unlink()
-        except FileNotFoundError:
-            pass
+            _verify_faverage_dim(cached, dim)
+            return cached
+        except Exception as e:
+            print(f"Cached faverage {cached} failed verification ({e}), rebuilding...")
+            try:
+                cached.unlink()
+            except FileNotFoundError:
+                pass
     print(f"Building faverage (DIM={dim})...")
     subprocess.run(["make", f"DIM={dim}", "programs=faverage"], cwd=PLOTFILE_TOOLS_DIR, check=True)
-    exe = find_one("faverage*.ex", PLOTFILE_TOOLS_DIR)
-    _verify_faverage_dim(exe, dim)
-    return exe
+    built = find_one("faverage*.ex", PLOTFILE_TOOLS_DIR)
+    _verify_faverage_dim(built, dim)
+    SHARED_TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(built, cached)
+    try:
+        cached.chmod(0o755)
+    except Exception:
+        pass
+    return cached
 
 
 def _verify_faverage_dim(exe: Path, expected_dim: int):
     """Check that faverage was compiled for expected_dim; it always averages
     along the last dimension (z in 3-D), so a DIM mismatch silently gives
     wrong y-profiles for Couette (y-varying)."""
+    # Prefer the build-tree Config if it belongs to this exe's build (for freshly built binaries)
     cfg = PLOTFILE_TOOLS_DIR / "tmp_build_dir" / "s" / f"{expected_dim}d.gnu.EXE" / "AMReX_Config.H"
     if cfg.is_file():
         txt = cfg.read_text()
         if f"#define AMREX_SPACEDIM {expected_dim}" not in txt:
             raise RuntimeError(f"faverage DIM check failed: {cfg} does not contain AMREX_SPACEDIM {expected_dim}")
         return
+    # For cached copies the build dir may have been overwritten by another DIM; fall back to strings
     try:
         out = subprocess.run(["strings", str(exe)], capture_output=True, text=True, timeout=5).stdout
         if f"AMREX_SPACEDIM {expected_dim}" not in out and f"BL_SPACEDIM {expected_dim}" not in out:
+            # Heuristic: if strings contains the other DIM, treat as mismatch
+            other = 3 if expected_dim == 2 else 2
+            if f"AMREX_SPACEDIM {other}" in out or f"BL_SPACEDIM {other}" in out:
+                raise RuntimeError(f"faverage {exe} appears to be DIM={other}, expected DIM={expected_dim}")
             print(f"Warning: could not verify faverage DIM={expected_dim} via strings; assuming build is correct")
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
+
+
+def _verify_fcompare_dim(exe: Path, expected_dim: int):
+    """Same DIM check for fcompare (used to validate cached copies)."""
+    cfg = PLOTFILE_TOOLS_DIR / "tmp_build_dir" / "s" / f"{expected_dim}d.gnu.EXE" / "AMReX_Config.H"
+    if cfg.is_file():
+        txt = cfg.read_text()
+        if f"#define AMREX_SPACEDIM {expected_dim}" not in txt:
+            raise RuntimeError(f"fcompare DIM check failed: {cfg} does not contain AMREX_SPACEDIM {expected_dim}")
+        return
+    try:
+        out = subprocess.run(["strings", str(exe)], capture_output=True, text=True, timeout=5).stdout
+        if f"AMREX_SPACEDIM {expected_dim}" not in out and f"BL_SPACEDIM {expected_dim}" not in out:
+            other = 3 if expected_dim == 2 else 2
+            if f"AMREX_SPACEDIM {other}" in out or f"BL_SPACEDIM {other}" in out:
+                raise RuntimeError(f"fcompare {exe} appears to be DIM={other}, expected DIM={expected_dim}")
+            print(f"Warning: could not verify fcompare DIM={expected_dim} via strings; assuming build is correct")
+    except RuntimeError:
+        raise
     except Exception:
         pass
 
