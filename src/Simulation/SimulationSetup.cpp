@@ -183,7 +183,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::reportStageTiming(int step) con
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
-    initData(m_rho, m_vel);
+    initData(m_rho, m_vel, *m_units);
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
 }
 

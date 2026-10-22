@@ -4,9 +4,11 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include "LBM/Units.H"
+
 namespace muphfasa {
 
-void initData(amrex::MultiFab& rho, amrex::MultiFab& vel);
+void initData(amrex::MultiFab& rho, amrex::MultiFab& vel, const UnitConverter& units);
 
 } // namespace muphfasa
 

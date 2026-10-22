@@ -21,13 +21,15 @@
 #include <AMReX_REAL.H>
 
 #include "IO/InputParser.H"
+#include "LBM/Units.H"
 
 namespace muphfasa {
 
-void initData(amrex::MultiFab& rho, amrex::MultiFab& vel)
+void initData(amrex::MultiFab& rho, amrex::MultiFab& vel, const UnitConverter& units)
 {
     InputParser params;
-    amrex::Real u0 = params.refVelocity();
+    amrex::Real u0 = units.toLatticeVelocity(params.refVelocity());
+
 
     const amrex::Box domain = rho.boxArray().minimalBox();
     const int N = domain.length(0);
