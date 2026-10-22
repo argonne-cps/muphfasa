@@ -260,7 +260,7 @@ def run_couette_transient_plot(
         order = np.argsort(coord_norm)
         color = cmap(k / max(len(show_idx) - 1, 1))
         ax_profiles.plot(u_sim[order] / U0, coord_norm[order], "o", color=color, ms=4,
-                         label=f"t={t:.0f}")
+                         label=f"t={t:.2f}")
         ax_profiles.plot(u_analytic[order] / U0, coord_norm[order], "-", color=color, lw=1)
 
     ax_profiles.plot([0, 1], [0, 1], "k--", lw=1, label=steady_label)

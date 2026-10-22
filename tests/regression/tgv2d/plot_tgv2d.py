@@ -182,7 +182,7 @@ def main() -> int:
         axes = [axes]
     for ax, i, vort in zip(axes, show_idx, vorts):
         im = ax.imshow(vort, origin="lower", cmap="RdBu_r", vmin=-vmax, vmax=vmax)
-        ax.set_title(f"t={times[i]:.0f}")
+        ax.set_title(f"t={times[i]:.2f}")
         ax.set_xticks([])
         ax.set_yticks([])
     fig.colorbar(im, ax=axes, shrink=0.8, label="vorticity")
