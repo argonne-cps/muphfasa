@@ -6,6 +6,7 @@
 #ifndef MUPHFASA_UNITS_H
 #define MUPHFASA_UNITS_H
 
+#include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
 #include <cmath>
@@ -58,6 +59,11 @@ public:
     amrex::Real machNumber()     const noexcept;  // Ma = u_lat / cs
     amrex::Real reynoldsNumber() const noexcept { return m_Re; } // Re = U_ref * L_ref / nu_ref
     amrex::Real relaxationTime() const noexcept { return m_tau; } // tau = nu_lat/cs2 + 0.5
+
+    // ── MultiFab lattice → physical (in-place) ─────────────────────────
+    void toPhysical(amrex::MultiFab& rho, amrex::MultiFab& vel) const noexcept;
+    void toPhysicalDensity(amrex::MultiFab& rho) const noexcept;
+    void toPhysicalVelocity(amrex::MultiFab& vel) const noexcept;
 
     // ── Lattice spacings ────────────────────────────────────────────────
     amrex::Real dx() const noexcept { return m_dx; }  // lattice spacing [m]

@@ -127,7 +127,20 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 
     if (step % m_params.plotInterval() == 0) {
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
-        writeMacroPlotfile(fname, m_rho, m_vel, m_geom, m_time, step);
+        // Plotfiles are written in physical (SI) units; solver state stays lattice.
+        const amrex::Real t_phys = m_units->toPhysicalTime(m_time);
+
+        // copy rho/vel
+        amrex::MultiFab rho_phys(m_rho.boxArray(), m_rho.DistributionMap(), m_rho.nComp(), 0);
+        amrex::MultiFab vel_phys(m_vel.boxArray(), m_vel.DistributionMap(), m_vel.nComp(), 0);
+        amrex::MultiFab::Copy(rho_phys, m_rho, 0, 0, m_rho.nComp(), 0);
+        amrex::MultiFab::Copy(vel_phys, m_vel, 0, 0, m_vel.nComp(), 0);
+
+        // convert units
+        m_units->toPhysical(rho_phys, vel_phys);
+
+        // writeout
+        writeMacroPlotfile(fname, rho_phys, vel_phys, m_geom, t_phys, step);
         reportStageTiming(step);
     }
 

@@ -121,6 +121,22 @@ amrex::Real UnitConverter::toPhysicalTime     (amrex::Real t_lat)   const noexce
 amrex::Real UnitConverter::toPhysicalViscosity(amrex::Real nu_lat)  const noexcept { return nu_lat * m_dx * m_dx / m_dt; }
 amrex::Real UnitConverter::toPhysicalDensity  (amrex::Real rho_lat) const noexcept { return rho_lat * m_rho_ref; }
 
+void UnitConverter::toPhysical(amrex::MultiFab& rho, amrex::MultiFab& vel) const noexcept
+{
+    toPhysicalDensity(rho);
+    toPhysicalVelocity(vel);
+}
+
+void UnitConverter::toPhysicalDensity(amrex::MultiFab& rho) const noexcept
+{
+    rho.mult(m_rho_ref);
+}
+
+void UnitConverter::toPhysicalVelocity(amrex::MultiFab& vel) const noexcept
+{
+    vel.mult(m_dx / m_dt);
+}
+
 amrex::Real UnitConverter::machNumber() const noexcept
 {
     return m_u_lat / std::sqrt(m_cs2);
