@@ -28,13 +28,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out repository (with AMReX submodule)
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
         with:
           submodules: recursive
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@main
         with:
           python-version: '3.x'
 
@@ -54,7 +54,7 @@ jobs:
       # is what keeps this job fast after the first run on a given submodule
       # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@main
         with:
           path: ~/.ccache
           key: tgv2d-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload plots and data
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@main
         with:
           name: tgv2d-regression-results
           path: |

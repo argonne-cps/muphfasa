@@ -28,13 +28,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository (with AMReX submodule)
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
         with:
           submodules: recursive
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@main
         with:
           python-version: '3.x'
 
@@ -51,7 +51,7 @@ jobs:
         run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@main
         with:
           path: ~/.ccache
           key: couette-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
@@ -78,7 +78,7 @@ jobs:
 
       - name: Upload plots and data
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@main
         with:
           name: couette-2d-results
           path: |
@@ -97,13 +97,13 @@ jobs:
         lattice: [D3Q15, D3Q19, D3Q27]
     steps:
       - name: Check out repository (with AMReX submodule)
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
         with:
           submodules: recursive
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@main
         with:
           python-version: '3.x'
 
@@ -120,7 +120,7 @@ jobs:
         run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Cache ccache
-        uses: actions/cache@v4
+        uses: actions/cache@main
         with:
           path: ~/.ccache
           key: couette-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
@@ -147,7 +147,7 @@ jobs:
 
       - name: Upload plots and data
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@main
         with:
           name: couette-3d-${{ matrix.lattice }}-results
           path: |
