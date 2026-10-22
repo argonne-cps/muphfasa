@@ -131,24 +131,34 @@ int main(int argc, char* argv[])
             sim->advance(step);
             sim->writeOutput(step);
 
-            // write out analytic soln
+            // write out analytic soln (both plt and analytic_plt are physical)
             if (step % params.plotInterval() == 0) {
-                // calc_analytic vel
+                // calc_analytic vel in lattice then convert to physical
                 const amrex::MultiFab& sim_vel = sim->vel();
+                const amrex::MultiFab& sim_rho = sim->rho();
                 amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
                                              sim_vel.nComp(), sim_vel.nGrow());
+                amrex::MultiFab analytic_rho(sim_rho.boxArray(), sim_rho.DistributionMap(),
+                                             sim_rho.nComp(), 0);
+                amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
 
                 calcAnalytic(analytic_vel, d_wall, H, U0, nu, sim->time());
+                sim->units().toPhysical(analytic_rho, analytic_vel);
+                const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
 
                 // write out file
                 muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
-                                             sim->rho(), analytic_vel, sim->geom(), sim->time(), step);
+                                             analytic_rho, analytic_vel, sim->geom(), t_phys, step);
 
-                // calc avg and max error (only on valid cells, not ghost cells)
+                // calc error in physical units
+                amrex::MultiFab sim_vel_phys(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                             sim_vel.nComp(), 0);
+                amrex::MultiFab::Copy(sim_vel_phys, sim_vel, 0, 0, sim_vel.nComp(), 0);
+                sim->units().toPhysicalVelocity(sim_vel_phys);
                 amrex::MultiFab diff(sim_vel.boxArray(), sim_vel.DistributionMap(),
                                      sim_vel.nComp(), 0);
                 amrex::MultiFab::Copy(diff, analytic_vel, 0, 0, sim_vel.nComp(), 0);
-                diff.minus(sim_vel, 0, sim_vel.nComp(), 0);
+                diff.minus(sim_vel_phys, 0, sim_vel.nComp(), 0);
                 diff.abs(0, sim_vel.nComp(), 0);
 
                 amrex::Real diff_max = diff.max(0);
