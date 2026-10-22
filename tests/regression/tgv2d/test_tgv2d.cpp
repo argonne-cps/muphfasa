@@ -67,7 +67,8 @@ int main(int argc, char* argv[])
         const int N = ncells[0];
         const amrex::Real k = tgv::waveNumber(N);
 
-        amrex::Real u0 = params.refVelocity();
+        amrex::Real u0_phys = params.refVelocity();
+        amrex::Real u0_lat = sim->units().toLatticeVelocity(u0_phys);
 
         const amrex::Real tau = sim->units().relaxationTime();
         const amrex::Real nu  = (tau - amrex::Real(0.5)) * tgv::kCs2;
@@ -94,23 +95,35 @@ int main(int argc, char* argv[])
                 amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
                                              sim_vel.nComp(), sim_vel.nGrow());
 
-                calcAnalytic(analytic_rho, analytic_vel, k, u0, nu, sim->time());
+                // calc analytic soln in lattice units
+                calcAnalytic(analytic_rho, analytic_vel, k, u0_lat, nu, sim->time());
+                // convert analytic (and sim copies) to physical for fcompare and error
+                sim->units().toPhysical(analytic_rho, analytic_vel);
+                const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
 
                 muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
-                        analytic_rho, analytic_vel, sim->geom(), sim->time(), step);
+                        analytic_rho, analytic_vel, sim->geom(), t_phys, step);
 
-                // calc error
+                // calc error in physical units
+                amrex::MultiFab sim_rho_phys(sim_rho.boxArray(), sim_rho.DistributionMap(),
+                                             sim_rho.nComp(), 0);
+                amrex::MultiFab sim_vel_phys(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                             sim_vel.nComp(), 0);
+                amrex::MultiFab::Copy(sim_rho_phys, sim_rho, 0, 0, sim_rho.nComp(), 0);
+                amrex::MultiFab::Copy(sim_vel_phys, sim_vel, 0, 0, sim_vel.nComp(), 0);
+                sim->units().toPhysical(sim_rho_phys, sim_vel_phys);
+
                 amrex::MultiFab diff_rho(sim_rho.boxArray(), sim_rho.DistributionMap(),
-                                             sim_rho.nComp(), sim_rho.nGrow());
+                                             sim_rho.nComp(), 0);
                 amrex::MultiFab diff_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
-                                             sim_vel.nComp(), sim_vel.nGrow());
-                                            
+                                             sim_vel.nComp(), 0);
+
                 amrex::MultiFab::Copy(diff_vel, analytic_vel, 0, 0, sim_vel.nComp(), 0);
-                diff_vel.minus(sim_vel, 0, sim_vel.nComp(), 0);
+                diff_vel.minus(sim_vel_phys, 0, sim_vel.nComp(), 0);
                 diff_vel.abs(0, sim_vel.nComp(), 0);
 
                 amrex::MultiFab::Copy(diff_rho, analytic_rho, 0, 0, sim_rho.nComp(), 0);
-                diff_rho.minus(sim_rho, 0, sim_rho.nComp(), 0);
+                diff_rho.minus(sim_rho_phys, 0, sim_rho.nComp(), 0);
                 diff_rho.abs(0, sim_rho.nComp(), 0);
 
                 amrex::Real err_vel = amrex::Real(0.0);

@@ -52,16 +52,25 @@ def parse_inputs_value(text: str, key: str) -> list:
     return m.group(1).split()
 
 
-UNITS_LOG_RE = re.compile(r"^nu_lat:\s*([-+0-9.eE]+)", re.MULTILINE)
+UNITS_LOG_RE = {
+    "nu_lat": re.compile(r"^nu_lat:\s*([-+0-9.eE]+)", re.MULTILINE),
+    "C_x": re.compile(r"^C_x:\s*([-+0-9.eE]+)", re.MULTILINE),
+    "C_t": re.compile(r"^C_t:\s*([-+0-9.eE]+)", re.MULTILINE),
+}
+
+
+def parse_units(log_text: str) -> dict:
+    out = {}
+    for key, pat in UNITS_LOG_RE.items():
+        m = pat.search(log_text)
+        if not m:
+            raise ValueError(f"could not find '{key}:' in solver log")
+        out[key] = float(m.group(1))
+    return out
 
 
 def parse_nu_lat(log_text: str) -> float:
-    """Pull nu_lat straight from UnitConverter's own startup banner (see
-    src/LBM/Units.cpp), consistent with how plot_couette.py reads it."""
-    m = UNITS_LOG_RE.search(log_text)
-    if not m:
-        raise ValueError("could not find 'nu_lat:' in solver log")
-    return float(m.group(1))
+    return parse_units(log_text)["nu_lat"]
 
 
 def run_solver(solver_exe: Path, inputs_path: Path, run_dir: Path, overrides: list) -> str:
@@ -81,10 +90,10 @@ def run_solver(solver_exe: Path, inputs_path: Path, run_dir: Path, overrides: li
     return log_path.read_text()
 
 
-def vorticity(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+def vorticity(u: np.ndarray, v: np.ndarray, dx: float = 1.0) -> np.ndarray:
     """omega_z = dv/dx - du/dy, central differences, periodic domain."""
-    dvdx = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / 2.0
-    dudy = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / 2.0
+    dvdx = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / (2.0 * dx)
+    dudy = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / (2.0 * dx)
     return dvdx - dudy
 
 
@@ -126,7 +135,7 @@ def main() -> int:
 
     inputs_text = args.inputs.read_text()
     n = int(parse_inputs_value(inputs_text, "grid.ncells")[0])
-    u0 = float(parse_inputs_value(inputs_text, "units.ref_velocity")[0])
+    u0_phys = float(parse_inputs_value(inputs_text, "units.ref_velocity")[0])
     k = 2.0 * math.pi / n
 
     if args.no_run:
@@ -134,7 +143,13 @@ def main() -> int:
     else:
         log_text = run_solver(solver_exe, args.inputs.resolve(), args.run_dir, args.override)
 
-    nu_lat = parse_nu_lat(log_text)
+    units = parse_units(log_text)
+    nu_lat = units["nu_lat"]
+    # Plotfiles are now physical; convert analytic scales to physical for
+    # comparison (vorticity/velocity now in SI units).
+    nu_phys = nu_lat * units["C_x"] ** 2 / units["C_t"]
+    # k_phys = 2*pi / Lx_phys, Lx_phys = n*C_x; k_lat = 2pi/n so k_phys = k / C_x
+    k_phys = k / units["C_x"]
 
     plt_dirs = sorted(
         (p for p in args.run_dir.glob("plt*") if re.fullmatch(r"plt\d+", p.name)),
@@ -157,7 +172,8 @@ def main() -> int:
     # ── Figure 1: vorticity-decay heatmaps ──────────────────────────────
     n_show = min(len(times), args.n_panels)
     show_idx = np.unique(np.round(np.linspace(0, len(times) - 1, n_show)).astype(int))
-    vorts = [vorticity(fields[i]["vx"], fields[i]["vy"]) for i in show_idx]
+    dx_phys = units["C_x"]
+    vorts = [vorticity(fields[i]["vx"], fields[i]["vy"], dx=dx_phys) for i in show_idx]
     vmax = max(abs(v).max() for v in vorts)
 
     fig, axes = plt.subplots(1, len(show_idx), figsize=(3 * len(show_idx), 3.2),
@@ -178,11 +194,11 @@ def main() -> int:
     max_speed = np.array([
         np.sqrt(f["vx"] ** 2 + f["vy"] ** 2).max() for f in fields
     ])
-    analytic_rate = -2.0 * nu_lat * k * k
+    analytic_rate = -2.0 * nu_phys * k_phys * k_phys
 
     fig2, ax2 = plt.subplots(figsize=(5, 4.5))
     ax2.semilogy(times, max_speed, "o", ms=4, label="simulation: max|u|")
-    ax2.semilogy(times, u0 * np.exp(analytic_rate * times), "k--",
+    ax2.semilogy(times, u0_phys * np.exp(analytic_rate * times), "k--",
                 label="analytic: u0*exp(-2*nu*k^2*t)")
 
     valid = max_speed > 0
