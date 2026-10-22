@@ -68,9 +68,8 @@ amrex::Real analyticCouette(amrex::Real y, amrex::Real H, amrex::Real U0,
 }
 
 // calc analytic soln on whole grid
-// Note: AMReX's ParallelFor accepts (i,j,k) in both 2D and 3D; k is ignored in 2D.
 // For 3D the wall normal is z (WALL_DIM=2) so we vary with k and dz.
-void calcAnalytic(amrex::MultiFab& vel, amrex::Real d_wall, amrex::Real H, amrex::Real U0,
+void calcAnalytic(amrex::MultiFab& vel, amrex::Real H, amrex::Real U0,
                   amrex::Real nu, amrex::Real t)
 {
     for (amrex::MFIter mfi(vel, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
@@ -84,9 +83,9 @@ void calcAnalytic(amrex::MultiFab& vel, amrex::Real d_wall, amrex::Real H, amrex
         amrex::ParallelFor(box,
             [=] AMREX_GPU_DEVICE(int i, int j, int k) {
 #if (AMREX_SPACEDIM == 3)
-                amrex::Real wall_coord = d_wall * (amrex::Real(k) + 0.5);
+                amrex::Real wall_coord = amrex::Real(k) + 0.5;
 #else
-                amrex::Real wall_coord = d_wall * (amrex::Real(j) + 0.5);
+                amrex::Real wall_coord = amrex::Real(j) + 0.5;
 #endif
                 velx_arr(i, j, k) = analyticCouette(wall_coord, H, U0, nu, t);
                 vely_arr(i, j, k) = 0.;
@@ -111,7 +110,6 @@ int main(int argc, char* argv[])
         // Get fundamental params (wall-normal is y in 2D, z in 3D)
         const int Nwall = params.ncells()[WALL_DIM];
         const amrex::Real H = amrex::Real(Nwall);
-        const amrex::Real d_wall = amrex::Real(1);
 
         const amrex::Real tau = sim->units().relaxationTime();
         const amrex::Real nu  = (tau - 0.5) / 3.0;
@@ -142,7 +140,7 @@ int main(int argc, char* argv[])
                                              sim_rho.nComp(), 0);
                 amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
 
-                calcAnalytic(analytic_vel, d_wall, H, U0, nu, sim->time());
+                calcAnalytic(analytic_vel, H, U0, nu, sim->time());
                 sim->units().toPhysical(analytic_rho, analytic_vel);
                 const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
 
