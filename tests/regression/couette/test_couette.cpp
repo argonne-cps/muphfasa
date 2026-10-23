@@ -175,8 +175,7 @@ int main(int argc, char* argv[])
 
         // printout results
         amrex::Print() << "Final Steady state error: " << final_error << '\n';
-
-        amrex::Finalize();
-        return 0;
     }
+    amrex::Finalize();
+    return 0;
 }
