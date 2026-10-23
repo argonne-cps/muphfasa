@@ -58,11 +58,12 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
 // not written out to MultiFabs
 template <typename LatticeTag, typename CollisionModel>
 void pullCollideFullArr(const amrex::Box& box,
-                    amrex::Array4<const amrex::Real> const& fin_arr,
-                    amrex::Array4<const amrex::Real> const& fout_arr,
+                    amrex::Array4<const amrex::Real> const& fstar_in_arr,
+                    amrex::Array4<const amrex::Real> const& fstar_out_arr,
                     amrex::Real omega);
 
-// Full stream/collision step: Pulls from f then collides w/ fused rho/u/feq/fstar computation in one MFIter pass.
+// Full stream/collision step: Pulls from f then collides 
+// w/ fused rho/u/feq/fstar computation in one MFIter pass.
 template <typename LatticeTag, typename CollisionModel>
 void pullCollideFullMF(const amrex::MultiFab& fin_mf,
                        amrex::MultiFab& fout_mf,
