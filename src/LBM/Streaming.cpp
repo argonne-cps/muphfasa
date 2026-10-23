@@ -11,23 +11,6 @@
 
 namespace muphfasa {
 
-// ── streamCell ─────────────────────────────────────────────────────────
-template <typename LatticeTag>
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real streamCell(amrex::Array4<const amrex::Real> const& f_in_arr,
-                       int i, int j, int k, int n) noexcept
-{
-#if (AMREX_SPACEDIM == 2)
-    const int i_old = i - LatticeTag::cx(n);
-    const int j_old = j - LatticeTag::cy(n);
-    return f_in_arr(i_old, j_old, k, n);
-#else
-    const int i_old = i - LatticeTag::cx(n);
-    const int j_old = j - LatticeTag::cy(n);
-    const int k_old = k - LatticeTag::cz(n);
-    return f_in_arr(i_old, j_old, k_old, n);
-#endif
-}
 
 template <typename LatticeTag>
 void default_stream(const amrex::Box& box,
