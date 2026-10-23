@@ -50,7 +50,6 @@ public:
     amrex::Real machNumber()     const;
     amrex::Real refLength()      const;   // [m]
     amrex::Real refVelocity()    const;   // [m/s]
-    amrex::Real refViscosity()   const;   // [m^2/s]
     amrex::Real refDensity()     const;   // [kg/m^3]
 
     // ── Geometry ─────────────────────────────────────────────────────────
@@ -66,6 +65,11 @@ public:
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
     amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall() const;
+
+    // Per-face inflow velocity (bc.lox_Uin, bc.hix_Uin, ...), same shape as
+    // Uwall() but with no restriction on the normal component (inflow
+    // velocity is expected to point into the domain).
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uinflow() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;

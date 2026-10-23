@@ -5,6 +5,7 @@
 
 #include "Checkpoint.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 #include <AMReX_Utility.H>
@@ -26,6 +27,8 @@ void writeCheckpoint(const std::string&     dir_name,
                      int                    step,
                      amrex::Real            time)
 {
+    BL_PROFILE("writeCheckpoint()");
+
     amrex::UtilCreateCleanDirectory(dir_name, false);
 
     if (amrex::ParallelDescriptor::IOProcessor()) {
@@ -50,6 +53,8 @@ void readCheckpoint(const std::string& dir_name,
                     int&               step,
                     amrex::Real&       time)
 {
+    BL_PROFILE("readCheckpoint()");
+
     if (!checkpointExists(dir_name)) {
         amrex::Abort("readCheckpoint: no Header file found in " + dir_name);
     }

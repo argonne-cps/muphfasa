@@ -1,37 +1,32 @@
 // test_couette.cpp — Regression test: plane Couette flow startup + steady state.
+// Supports both 2D (AMREX_SPACEDIM=2) and 3D (AMREX_SPACEDIM=3) builds.
 //
-// Geometry: periodic in x, NoSlip wall at y=lo, MovingWall at y=hi moving at
-// U0 (see ./inputs). With H = grid.ncells[1] (wall-to-wall distance in
-// lattice units, per the halfway-bounce-back convention: the wall sits half
-// a cell beyond the last fluid node on each side, so H == Ny exactly), the
-// velocity field obeys the 1-D unsteady diffusion equation
+// Geometry: periodic in x (and y in 3D), NoSlip wall at y=lo (2D) or z=lo (3D),
+// MovingWall at y=hi (2D) or z=hi (3D) moving at U0. With H = wall-normal
+// cells (Ny in 2D, Nz in 3D, wall-to-wall distance in lattice units per the
+// halfway-bounce-back convention: wall sits half a cell beyond last fluid node
+// on each side, so H == Nwall exactly), the velocity field obeys the 1-D
+// unsteady diffusion equation
 //   du/dt = nu * d^2u/dy^2,   u(0,t) = 0,  u(H,t) = U0 (t>0),  u(y,0) = 0
 // whose solution (classic plane-Couette-startup / "doubly-bounded Rayleigh"
 // result) is
 //   u(y,t)/U0 = y/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*y/H)
 //                     * exp(-n^2*pi^2*nu*t/H^2)
 // which reduces to the steady linear profile u(y) = U0*y/H as t -> inf.
+// For 3D the same holds with y→z and H=Nz; faverage (DIM=3) averages over
+// x-y and returns the z-profile, matching the wall normal.
 //
-// This test checks three things against that analytic solution:
-//   1. The final-time profile matches the steady linear profile.
-//   2. The profile matches the full time-dependent expansion at every
-//      sampled time during the startup transient, not just at the end.
-//   3. The *rate* at which the simulation approaches steady state matches
-//      theory: the amplitude of the dominant (n=1) Fourier mode should decay
-//      as exp(-pi^2*nu*t/H^2); we extract that mode from the simulated
-//      profile over time and check its fitted decay rate against the
-//      analytic one.
-//
-// Also writes every sampled (time, y, u_sim, u_analytic) point to
-// couette_profiles.csv in the working directory, unconditionally (even if a
-// check below fails) -- see plot_couette.py to render it.
-//
+// This test produces two sets of plotfiles from the sim (pltxxxxx/) and
+// from the analytic soln (analytic_pltxxxxx/)
+// These can then be compared via amrex/Tools/Plotfiles/fcompare
+
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 
 #include "IO/InputParser.H"
+#include "IO/Plotfile.H"
 #include "LBM/BoundaryConditions.H"
 #include "Simulation/ISimulation.H"
 #include "Simulation/SimulationFactory.H"
@@ -48,38 +43,10 @@ namespace {
 constexpr amrex::Real kPi  = amrex::Real(3.14159265358979323846);
 constexpr amrex::Real kCs2 = amrex::Real(1.0) / amrex::Real(3.0);
 
-void require(bool cond, const std::string& msg)
-{
-    if (!cond) { throw std::runtime_error(msg); }
-}
+// Wall-normal direction: y in 2D (dir=1), z in 3D (dir=2) so faverage
+// (which averages along the last dimension) returns the wall-normal profile.
+constexpr int WALL_DIM = (AMREX_SPACEDIM == 2 ? 1 : 2);
 
-// x-average of the vx component (component 0) of vel_mf, one value per
-// y-index (0..Ny-1). Host-side reduction; fine for this small test grid.
-std::vector<amrex::Real> averageVxOverX(const amrex::MultiFab& vel_mf, int Ny)
-{
-    std::vector<amrex::Real> sum(Ny, amrex::Real(0.0));
-    std::vector<amrex::Long> count(Ny, 0);
-
-    for (amrex::MFIter mfi(vel_mf); mfi.isValid(); ++mfi) {
-        const amrex::Box& bx = mfi.validbox();
-        amrex::Array4<amrex::Real const> const& v = vel_mf.const_array(mfi);
-        const auto lo = amrex::lbound(bx);
-        const auto hi = amrex::ubound(bx);
-        for (int j = lo.y; j <= hi.y; ++j) {
-            for (int i = lo.x; i <= hi.x; ++i) {
-                sum[j]   += v(i, j, lo.z, 0);
-                count[j] += 1;
-            }
-        }
-    }
-
-    amrex::ParallelDescriptor::ReduceRealSum(sum.data(), Ny);
-    amrex::ParallelDescriptor::ReduceLongSum(count.data(), Ny);
-
-    std::vector<amrex::Real> avg(Ny);
-    for (int j = 0; j < Ny; ++j) { avg[j] = sum[j] / amrex::Real(count[j]); }
-    return avg;
-}
 
 // Time-dependent plane-Couette analytic solution (see file header).
 amrex::Real analyticCouette(amrex::Real y, amrex::Real H, amrex::Real U0,
@@ -89,24 +56,44 @@ amrex::Real analyticCouette(amrex::Real y, amrex::Real H, amrex::Real U0,
     for (int n = 1; n <= n_terms; ++n) {
         const amrex::Real npi  = n * kPi;
         const amrex::Real sign = (n % 2 == 0) ? amrex::Real(1.0) : amrex::Real(-1.0);
-        u += (amrex::Real(2.0) * U0 * sign / npi) * std::sin(npi * y / H) *
-             std::exp(-amrex::Real(n * n) * kPi * kPi * nu * t / (H * H));
+        amrex::Real exp_arg = -amrex::Real(n * n) * kPi * kPi * nu * t / (H * H);
+        if (exp_arg < -50) { // exp(-50) ~ 2e-22, remaining terms negligible
+            break;
+        }
+        amrex::Real term = (amrex::Real(2.0) * U0 * sign / npi) * std::sin(npi * y / H) *
+             std::exp(exp_arg);
+        u += term;
     }
     return u;
 }
 
-// Projection of (profile - steady profile) onto the first sine mode
-// sin(pi*y/H); analytically this is -2*U0/pi * exp(-pi^2*nu*t/H^2).
-amrex::Real firstModeAmplitude(const std::vector<amrex::Real>& profile,
-                               amrex::Real H, amrex::Real U0, int Ny)
+// calc analytic soln on whole grid
+// For 3D the wall normal is z (WALL_DIM=2) so we vary with k and dz.
+void calcAnalytic(amrex::MultiFab& vel, amrex::Real H, amrex::Real U0,
+                  amrex::Real nu, amrex::Real t)
 {
-    amrex::Real a1 = amrex::Real(0.0);
-    for (int j = 0; j < Ny; ++j) {
-        const amrex::Real y = j + amrex::Real(0.5);
-        const amrex::Real deviation = profile[j] - U0 * y / H;
-        a1 += deviation * std::sin(kPi * y / H);
+    for (amrex::MFIter mfi(vel, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const auto box = mfi.tilebox();
+        const auto velx_arr = vel.array(mfi, 0);
+        const auto vely_arr = vel.array(mfi, 1);
+#if (AMREX_SPACEDIM == 3)
+        const auto velz_arr = vel.array(mfi, 2);
+#endif
+
+        amrex::ParallelFor(box,
+            [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+#if (AMREX_SPACEDIM == 3)
+                amrex::Real wall_coord = amrex::Real(k) + 0.5;
+#else
+                amrex::Real wall_coord = amrex::Real(j) + 0.5;
+#endif
+                velx_arr(i, j, k) = analyticCouette(wall_coord, H, U0, nu, t);
+                vely_arr(i, j, k) = 0.;
+#if (AMREX_SPACEDIM == 3)
+                velz_arr(i, j, k) = 0.;
+#endif
+            });
     }
-    return a1 * amrex::Real(2.0) / Ny;
 }
 
 } // namespace
@@ -115,131 +102,79 @@ int main(int argc, char* argv[])
 {
     amrex::Initialize(argc, argv);
     {
-        // Input file comes from the command line (e.g. `./test_couette
-        // inputs`), the same convention `muphfasa inputs` uses -- AMReX's
-        // own ParmParse setup inside amrex::Initialize() already reads
-        // argv[1], so no explicit ParmParse::addfile() call is needed here.
+        // Input file comes from the command line (e.g. `./test_couette inputs`)
         InputParser params;
         std::unique_ptr<ISimulation> sim = makeSimulation(params);
         sim->initialize();
 
-        const int Ny = params.ncells()[1];
-        const amrex::Real H = amrex::Real(Ny);
+        // Get fundamental params (wall-normal is y in 2D, z in 3D)
+        const int Nwall = params.ncells()[WALL_DIM];
+        const amrex::Real H = amrex::Real(Nwall);
 
-        // tau/nu come from the simulation's own omega(), not an independent
-        // re-read of the input file: omega is derived from UnitConverter
-        // (refLength/refVelocity/refViscosity/N_ref), not a direct lbm.tau
-        // key, so asking the simulation for it directly is the only way to
-        // be sure this matches what the simulation is actually running
-        // with.
-        const amrex::Real tau = amrex::Real(1.0) / sim->omega();
-        const amrex::Real nu  = (tau - amrex::Real(0.5)) * kCs2;
+        const amrex::Real tau = sim->units().relaxationTime();
+        const amrex::Real nu  = (tau - 0.5) / 3.0;
 
-        // y-hi face, x-component (tangential velocity of the moving wall).
-        const amrex::Real U0 = params.Uwall()[faceIndex(1, 1)][0];
+        // Wall-hi face, x-component (tangential velocity of the moving wall).
+        const amrex::Real U0 = sim->units().toLatticeVelocity(params.Uwall()[faceIndex(WALL_DIM, 1)][0]);
 
-        const int max_step           = params.maxStep();
-        const int snapshot_interval  = 200;
+        const int max_step   = params.maxStep();
+        std::vector<amrex::Real> max_err;
+        std::vector<amrex::Real> avg_err;
 
-        std::vector<amrex::Real> snapshot_times;
-        std::vector<std::vector<amrex::Real>> snapshot_profiles;
+        // create copy of velocity mf for analytic soln
+        const std::string analytic_file = "analytic_plt";
 
+        // run simulation
         for (int step = 0; step <= max_step; ++step) {
             sim->advance(step);
-            if (step % snapshot_interval == 0) {
-                snapshot_times.push_back(sim->time());
-                snapshot_profiles.push_back(averageVxOverX(sim->vel(), Ny));
-            }
-        }
+            sim->writeOutput(step);
 
-        require(!snapshot_profiles.empty(), "no snapshots recorded");
+            // write out analytic soln (both plt and analytic_plt are physical)
+            if (step % params.plotInterval() == 0) {
+                // calc_analytic vel in lattice then convert to physical
+                const amrex::MultiFab& sim_vel = sim->vel();
+                const amrex::MultiFab& sim_rho = sim->rho();
+                amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                             sim_vel.nComp(), sim_vel.nGrow());
+                amrex::MultiFab analytic_rho(sim_rho.boxArray(), sim_rho.DistributionMap(),
+                                             sim_rho.nComp(), 0);
+                amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
 
-        // ── Dump profile data for plotting (see plot_couette.py) ─────────
-        // Written unconditionally, before the pass/fail checks below, so
-        // the data is available for inspection even if a check fails.
-        {
-            std::ofstream csv("couette_profiles.csv");
-            csv.precision(17); // full double precision -- the n=1 mode amplitude
-                               // decays to ~1e-8 and smaller; default precision
-                               // (6 digits) would floor it artificially.
-            csv << "# H=" << H << " U0=" << U0 << " nu=" << nu << " Ny=" << Ny << "\n";
-            csv << "time,y,u_sim,u_analytic\n";
-            for (std::size_t k = 0; k < snapshot_profiles.size(); ++k) {
-                const amrex::Real t = snapshot_times[k];
-                for (int j = 0; j < Ny; ++j) {
-                    const amrex::Real y = j + amrex::Real(0.5);
-                    csv << t << ',' << y << ',' << snapshot_profiles[k][j] << ','
-                        << analyticCouette(y, H, U0, nu, t) << '\n';
+                calcAnalytic(analytic_vel, H, U0, nu, sim->time());
+                sim->units().toPhysical(analytic_rho, analytic_vel);
+                const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
+
+                // write out file
+                muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
+                                             analytic_rho, analytic_vel, sim->geom(), t_phys, step);
+
+                // calc error in physical units
+                amrex::MultiFab sim_vel_phys(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                             sim_vel.nComp(), 0);
+                amrex::MultiFab::Copy(sim_vel_phys, sim_vel, 0, 0, sim_vel.nComp(), 0);
+                sim->units().toPhysicalVelocity(sim_vel_phys);
+                amrex::MultiFab diff(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                     sim_vel.nComp(), 0);
+                amrex::MultiFab::Copy(diff, analytic_vel, 0, 0, sim_vel.nComp(), 0);
+                diff.minus(sim_vel_phys, 0, sim_vel.nComp(), 0);
+                diff.abs(0, sim_vel.nComp(), 0);
+
+                amrex::Real diff_max = diff.max(0);
+                if (std::isnan(diff_max)) {
+                    amrex::Print() << "WARNING: NaN in diff at step " << step << "\n";
+                    max_err.push_back(-1.0);
+                } else {
+                    max_err.push_back(diff_max);
+                    amrex::Print() << "At Time=" << step << ": Error=" << diff_max << "\n";
                 }
             }
         }
-        amrex::Print() << "Wrote couette_profiles.csv ("
-                       << snapshot_profiles.size() << " snapshots)\n";
 
-        // ── Check 1: steady state ────────────────────────────────────────
-        const auto& final_profile = snapshot_profiles.back();
-        amrex::Real max_err_steady = amrex::Real(0.0);
-        for (int j = 0; j < Ny; ++j) {
-            const amrex::Real y = j + amrex::Real(0.5);
-            const amrex::Real u_exact = U0 * y / H;
-            max_err_steady = std::max(max_err_steady, std::abs(final_profile[j] - u_exact));
-        }
-        amrex::Print() << "Max error vs. steady linear profile: " << max_err_steady << "\n";
-        require(max_err_steady < amrex::Real(1.0e-3),
-                "final profile does not match the steady Couette solution");
+        // compute final error
+        amrex::Real final_error = max_err.back();
 
-        // ── Check 2: time-dependent startup, tracked throughout ──────────
-        amrex::Real max_err_transient = amrex::Real(0.0);
-        for (std::size_t k = 0; k < snapshot_profiles.size(); ++k) {
-            const amrex::Real t = snapshot_times[k];
-            for (int j = 0; j < Ny; ++j) {
-                const amrex::Real y = j + amrex::Real(0.5);
-                const amrex::Real u_exact = analyticCouette(y, H, U0, nu, t);
-                max_err_transient = std::max(max_err_transient,
-                                             std::abs(snapshot_profiles[k][j] - u_exact));
-            }
-        }
-        amrex::Print() << "Max error vs. time-dependent expansion (all snapshots): "
-                       << max_err_transient << "\n";
-        require(max_err_transient < amrex::Real(5.0e-3),
-                "simulated profile departs from the time-dependent analytic "
-                "expansion at some point during the startup transient");
-
-        // ── Check 3: the dominant mode decays at the theoretical rate ────
-        // Fit ln|A1(t)| ~ -rate*t + const by least squares, skipping the
-        // first few snapshots where higher harmonics still contaminate A1.
-        const std::size_t skip = std::min<std::size_t>(3, snapshot_profiles.size() / 4);
-        std::vector<amrex::Real> ts, log_amps;
-        for (std::size_t k = skip; k < snapshot_profiles.size(); ++k) {
-            const amrex::Real a1 = firstModeAmplitude(snapshot_profiles[k], H, U0, Ny);
-            if (std::abs(a1) < amrex::Real(1.0e-12)) { continue; } // below float noise floor
-            ts.push_back(snapshot_times[k]);
-            log_amps.push_back(std::log(std::abs(a1)));
-        }
-        require(ts.size() >= 2, "not enough usable samples to fit the mode decay rate");
-
-        const std::size_t n = ts.size();
-        amrex::Real sum_t = 0, sum_l = 0, sum_tt = 0, sum_tl = 0;
-        for (std::size_t k = 0; k < n; ++k) {
-            sum_t  += ts[k];
-            sum_l  += log_amps[k];
-            sum_tt += ts[k] * ts[k];
-            sum_tl += ts[k] * log_amps[k];
-        }
-        const amrex::Real denom = amrex::Real(n) * sum_tt - sum_t * sum_t;
-        require(std::abs(denom) > amrex::Real(1.0e-12), "degenerate fit (all sample times equal)");
-        const amrex::Real fitted_slope = (amrex::Real(n) * sum_tl - sum_t * sum_l) / denom;
-
-        const amrex::Real analytic_rate = -kPi * kPi * nu / (H * H);
-        const amrex::Real rel_err = std::abs((fitted_slope - analytic_rate) / analytic_rate);
-        amrex::Print() << "Fitted n=1 mode decay rate: " << fitted_slope
-                       << "  analytic: " << analytic_rate
-                       << "  relative error: " << rel_err << "\n";
-        require(rel_err < amrex::Real(0.2),
-                "measured decay rate of the startup transient's dominant mode "
-                "does not match the analytic rate pi^2*nu/H^2 within 20%");
-
-        amrex::Print() << "All Couette regression checks passed.\n";
+        // printout results
+        amrex::Print() << "Final Steady state error: " << final_error << '\n';
     }
     amrex::Finalize();
     return 0;

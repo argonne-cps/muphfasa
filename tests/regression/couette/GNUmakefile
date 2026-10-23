@@ -5,47 +5,18 @@
 #   make                      # build test_couette (2-D, no MPI, by default)
 #   ./test_couette2d.gnu.ex inputs
 #
-# Only DIM and USE_EB are overridden below -- everything else (DEBUG,
-# USE_MPI, USE_OMP, USE_CUDA, USE_HIP) already matches AMReX's own default,
-# and '.' doesn't need adding to VPATH_LOCATIONS: Make.rules prepends it
-# unconditionally.
+#   make DIM=3                # builds test_couette3d.gnu.ex
+#   ./test_couette3d.gnu.ex inputs3d
+#
+# All the shared build logic (AMReX modules, solver sources, Make.rules)
+# lives in ../../../Make.muphfasa; see that file for defaults.
 
-AMREX_HOME ?= $(CURDIR)/../../../external/amrex
+TOP := ../../..
 
-COMP ?= gnu
-DIM  ?= 2
-USE_EB ?= TRUE
-
-BL_NO_FORT = TRUE
+DIM ?= 2
 
 EBASE = test_couette
 
-SRC_DIR := ../../../src
-
-VPATH_LOCATIONS   += $(SRC_DIR)/LBM $(SRC_DIR)/Geometry $(SRC_DIR)/IO $(SRC_DIR)/Simulation
-INCLUDE_LOCATIONS += $(SRC_DIR) $(SRC_DIR)/LBM $(SRC_DIR)/Geometry $(SRC_DIR)/IO $(SRC_DIR)/Simulation
-
 CEXE_sources += test_couette.cpp
 
-# Solver sources, excluding main.cpp (this test defines its own main()).
-CEXE_sources += LatticeDescriptor.cpp
-CEXE_sources += Macroscopic.cpp
-CEXE_sources += Equilibrium.cpp
-CEXE_sources += Streaming.cpp
-CEXE_sources += Collision.cpp
-CEXE_sources += BoundaryConditions.cpp
-CEXE_sources += Units.cpp
-CEXE_sources += GeometryHandler.cpp
-CEXE_sources += InputParser.cpp
-CEXE_sources += Checkpoint.cpp
-CEXE_sources += Plotfile.cpp
-CEXE_sources += SimulationSetup.cpp
-CEXE_sources += SimulationFactory.cpp
-
-include $(AMREX_HOME)/Tools/GNUMake/Make.defs
-
-Pdirs := Base Boundary AmrCore EB
-Ppack += $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
-include $(Ppack)
-
-include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+include $(TOP)/Make.muphfasa

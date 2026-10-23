@@ -7,6 +7,7 @@
 #include "LatticeDescriptor.H"
 #include "Macroscopic.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
@@ -28,6 +29,8 @@ void BGK::collideArr(const amrex::Box& box,
                      amrex::Array4<const amrex::Real> const& feq_arr,
                      const amrex::Real omega)
 {
+    BL_PROFILE("BGK::collideArr()");
+
     amrex::ParallelFor(box, LatticeTag::Q,
                 [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
         f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega);
@@ -40,6 +43,8 @@ void collideMF(amrex::MultiFab&       f_mf,
              const amrex::MultiFab& feq_mf,
              amrex::Real            omega)
 {
+    BL_PROFILE("collideMF()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -50,6 +55,9 @@ void collideMF(amrex::MultiFab&       f_mf,
         amrex::Array4<amrex::Real const> const& feq_arr = feq_mf[mfi].const_array();
         CollisionModel::template collideArr<LatticeTag>(tileBox, f_arr, feq_arr, omega);
     }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── collideFullArr (per-tile kernel) ──────────────────────────────────────
@@ -60,6 +68,8 @@ void collideFullArr(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& f_arr,
                     amrex::Real omega)
 {
+        BL_PROFILE("collideFullArr()");
+
     amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
 
         // calc rho
@@ -90,6 +100,8 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
                    const amrex::MultiFab& f_mf,
                    amrex::Real            omega)
 {
+    BL_PROFILE("collideFullMF()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -101,6 +113,9 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
 
         collideFullArr<LatticeTag, CollisionModel>(tileBox, fstar_arr, f_arr, omega);
     }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 

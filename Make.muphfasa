@@ -1,0 +1,47 @@
+# Make.muphfasa -- shared GNUMake build logic for muphfasa, included by the
+# top-level GNUmakefile and by every tests/regression/*/GNUmakefile.
+#
+# Modeled on MAESTROeX's Exec/Make.Maestro / Castro's Exec/Make.Castro: one
+# common file holds everything that doesn't vary per program (AMReX module
+# list, solver source list, Make.defs/Make.rules includes), so each
+# program's own GNUmakefile only needs to set build-option overrides plus
+# EBASE and its own CEXE_sources, then `include` this file.
+#
+# Expected from the including GNUmakefile:
+#   TOP     -- path to the muphfasa repo root, relative to that directory
+#   EBASE   -- name of the resulting executable
+#   (optionally) CEXE_sources/DIM/COMP/... overrides, set before the include
+
+AMREX_HOME ?= $(TOP)/external/amrex
+
+# COMP/DIM/DEBUG/USE_MPI/USE_OMP/USE_CUDA/USE_HIP are intentionally left to
+# AMReX's own Make.defs defaults (COMP=gnu, DEBUG=FALSE, USE_MPI=FALSE, ...)
+# unless the including GNUmakefile overrides them -- this project's top-level
+# GNUmakefile wants MPI on by default, while the regression tests want a
+# quick, dependency-light local build, so neither default belongs here.
+USE_EB ?= TRUE
+
+# No Fortran sources in this project.
+BL_NO_FORT = TRUE
+
+# ── muphfasa solver sources (shared by every executable) ───────────────────
+Bdirs := src src/LBM src/Geometry src/IO src/Simulation
+Bpack += $(TOP)/src/Make.package
+Blocs += $(foreach dir, $(Bdirs), $(TOP)/$(dir))
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.defs
+
+# ── AMReX library modules ───────────────────────────────────────────────────
+# Base    : core data structures (MultiFab, BoxArray, Geometry, ParmParse, ...)
+# Boundary: ghost-cell/boundary-fill infrastructure, used by the EB module
+# AmrCore : Interpolater base class, used by the EB module
+# EB      : embedded-boundary geometry (AMReX_EB2.H, AMReX_EBFabFactory.H)
+Pdirs := Base Boundary AmrCore EB
+Bpack += $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
+
+include $(Bpack)
+
+VPATH_LOCATIONS   += $(Blocs)
+INCLUDE_LOCATIONS += $(Blocs)
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.rules

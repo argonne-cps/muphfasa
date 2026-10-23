@@ -1,0 +1,46 @@
+# Regression test: 2-D Taylor-Green vortex decay.
+# Doubly-periodic NxN domain, one vortex pair per side (see TgvAnalytic.H).
+# InitData.cpp (this directory) sets the initial condition to the exact
+# solution at t=0; test_tgv2d.cpp compares the solver's evolution against
+# the exact solution at later times.
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells      = 64 64    # square: one vortex wavelength per side
+grid.max_grid_size = 64
+grid.n_ghost     = 1
+
+# ── Simulation ───────────────────────────────────────────────────────────
+# At N=64, tau=0.8 (nu_lat=0.1 below) and k=2*pi/64, the velocity field
+# decays by exp(-2*nu*k^2*t); max_step=2000 reaches exp(...) ~ 0.02 (~98%
+# decayed), giving a clear visual decay over the amr.plot_int=200 snapshots.
+sim.max_step     = 2000
+sim.stop_time    = -1.0     # run to max_step
+
+# ── LBM ──────────────────────────────────────────────────────────────────
+lbm.lattice_type = D2Q9
+lbm.tau          = 0.8      # pinned directly: nu_lat = (tau-0.5)*cs2 = 0.1
+
+# ── Physical units ─────────────────────────────────────────────────────────
+# units.Re must be nonzero (UnitConverter divides by it internally) but its
+# exact value has no effect here, since lbm.tau is pinned directly above --
+# see src/LBM/Units.cpp. units.ref_velocity doubles as the TGV vortex
+# amplitude u0 (read via InputParser::refVelocity() by both InitData.cpp and
+# test_tgv2d.cpp), in lattice units.
+units.ref_length    = 64.0
+units.ref_velocity  = 0.002
+units.Re            = 1.0
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+# Fully periodic; GeometryHandler derives is_periodic from these names.
+bc.lo_type = Periodic  Periodic
+bc.hi_type = Periodic  Periodic
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 1.0  1.0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 200
+amr.chk_int         = 2001
+amr.plot_file       = plt
+amr.check_file      = chk

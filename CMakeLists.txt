@@ -63,6 +63,7 @@ set(MUPHFASA_SOURCES
     src/IO/Plotfile.cpp
     src/Simulation/SimulationSetup.cpp
     src/Simulation/SimulationFactory.cpp
+    src/Simulation/InitData.cpp
 )
 
 add_executable(muphfasa ${MUPHFASA_SOURCES})

@@ -11,6 +11,60 @@
 
 #include <vector>
 
+namespace {
+
+// Shared by InputParser::Uwall()/Uinflow(): reads one GpuArray<Real,SPACEDIM>
+// per face from ParmParse keys `param_names`, leaving a face zero-filled if
+// its key is absent. If `enforce_normal_zero` is set, aborts when a face's
+// component along its own normal direction is nonzero (used by Uwall(),
+// where a nonzero normal component would imply an expanding/contracting
+// wall; not used by Uinflow(), where that component is expected).
+amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM>
+readPerFaceVelocity(amrex::ParmParse& pp,
+                     const std::vector<std::string>& param_names,
+                     bool enforce_normal_zero,
+                     bool enforce_tangent_zero)
+{
+    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> U{};
+
+    for (int dir=0; dir < 2 * AMREX_SPACEDIM; ++dir) {
+        std::vector<amrex::Real> curr_U{};
+        pp.queryarr(param_names[dir], curr_U);
+        if (curr_U.empty()) continue; // velocity not specified for this face
+
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            static_cast<int>(curr_U.size()) == AMREX_SPACEDIM,
+            ("InputParser: " + param_names[dir] + " must list exactly "
+             "AMREX_SPACEDIM components").c_str());
+
+        const int normal_dim = dir / 2;
+        for (int dim=0; dim < AMREX_SPACEDIM; ++dim){
+            if (enforce_normal_zero && dim == normal_dim) {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    curr_U[dim] == 0.,
+                    ("InputParser: " + param_names[dir] + " has a nonzero "
+                     "component along the wall normal (component " + std::to_string(dim) +
+                     "), which implies an expanding/contracting wall. Only wall "
+                     "velocities tangential to the face are supported for Moving walls.").c_str());
+            }
+            else if (enforce_tangent_zero && dim != normal_dim) {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+                    curr_U[dim] == 0.,
+                    ("InputParser: " + param_names[dir] + " has a nonzero "
+                     "component tangent to the wall (component " + std::to_string(dim) +
+                     "), which implies a moving Inflow/outflow. Only "
+                     "velocities normal to the face are supported for Inflows.").c_str());
+
+            }
+            U[dir][dim] = curr_U[dim];
+        }
+    }
+
+    return U;
+}
+
+} // namespace
+
 namespace muphfasa {
 
 InputParser::InputParser()
@@ -123,13 +177,6 @@ amrex::Real InputParser::refVelocity() const
     return val;
 }
 
-amrex::Real InputParser::refViscosity() const
-{
-    amrex::ParmParse pp("units");
-    amrex::Real val = amrex::Real(1.0e-6);
-    pp.query("ref_viscosity", val);
-    return val;
-}
 
 amrex::Real InputParser::refDensity() const
 {
@@ -203,46 +250,18 @@ std::array<std::string, 2 * AMREX_SPACEDIM> InputParser::bcNames() const
 
 amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> InputParser::Uwall() const {
     amrex::ParmParse pp("bc");
+    static const std::vector<std::string> param_Uwall = {"lox_Uwall", "hix_Uwall",
+                                                          "loy_Uwall", "hiy_Uwall",
+                                                          "loz_Uwall", "hiz_Uwall"};
+    return readPerFaceVelocity(pp, param_Uwall, true, false);
+}
 
-    std::vector<amrex::Real> lox_Uwall, hix_Uwall,
-                             loy_Uwall, hiy_Uwall,
-                             loz_Uwall, hiz_Uwall;
-    
-    
-    amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uwall{};
-
-    std::vector<std::string> param_Uwall = {"lox_Uwall", "hix_Uwall",
-                                            "loy_Uwall", "hiy_Uwall",
-                                            "loz_Uwall", "hiz_Uwall"};
-    // loop over each wall 
-    for (int dir=0; dir < 2 * AMREX_SPACEDIM; ++dir) {
-        std::vector<amrex::Real> curr_U{};
-        pp.queryarr(param_Uwall[dir], curr_U);
-        if (curr_U.empty()) continue; // wall velocity not specified for this face
-
-        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-            static_cast<int>(curr_U.size()) == AMREX_SPACEDIM,
-            ("InputParser::Uwall: " + param_Uwall[dir] + " must list exactly "
-             "AMREX_SPACEDIM components").c_str());
-
-        // fill our Uwall array
-        const int normal_dim = dir / 2;
-        for (int dim=0; dim < AMREX_SPACEDIM; ++dim){
-            // don't set wall-direction velocity
-            if (dim != normal_dim) {
-                Uwall[dir][dim] = curr_U[dim];
-            } else {
-                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-                    curr_U[dim] == 0.,
-                    ("InputParser::Uwall: " + param_Uwall[dir] + " has a nonzero "
-                     "component along the wall normal (component " + std::to_string(dim) +
-                     "), which implies an expanding/contracting wall. Only wall "
-                     "velocities tangential to the face are supported.").c_str());
-            }
-        }
-    }
-
-    return Uwall;
+amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> InputParser::Uinflow() const {
+    amrex::ParmParse pp("bc");
+    static const std::vector<std::string> param_Uin = {"lox_Uin", "hix_Uin",
+                                                        "loy_Uin", "hiy_Uin",
+                                                        "loz_Uin", "hiz_Uin"};
+    return readPerFaceVelocity(pp, param_Uin, false, true);
 }
 
 int InputParser::plotInterval() const

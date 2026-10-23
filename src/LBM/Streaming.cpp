@@ -6,6 +6,7 @@
 #include "Streaming.H"
 #include "LatticeDescriptor.H"
 
+#include <AMReX_BLProfiler.H>
 #include <AMReX_GpuLaunch.H>
 
 namespace muphfasa {
@@ -33,6 +34,8 @@ void default_stream(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& f_in_arr,
                     amrex::Array4<amrex::Real> const& f_out_arr) {
 
+    BL_PROFILE("default_stream()");
+
     amrex::ParallelFor(box, LatticeTag::Q, [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
         f_out_arr(i, j, k, n) = streamCell<LatticeTag>(f_in_arr, i, j, k, n);
     });
@@ -44,6 +47,8 @@ void stream(const amrex::MultiFab& f_in,
             amrex::MultiFab&       f_out,
             const amrex::Geometry& geom)
 {
+    BL_PROFILE("stream()");
+
     #ifdef _OPENMP
     #pragma omp parallel
     #endif
@@ -55,6 +60,9 @@ void stream(const amrex::MultiFab& f_in,
 
         default_stream<LatticeTag>(tileBox, fi_arr, fo_arr);
     }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── In-place streaming (using scratch space) ──────────────────────────────
@@ -62,10 +70,15 @@ template <typename LatticeTag>
 void streamInPlace(amrex::MultiFab&       f,
                    const amrex::Geometry& geom)
 {
+    BL_PROFILE("streamInPlace()");
+
     amrex::MultiFab f_scratch(f.boxArray(), f.DistributionMap(),
                                f.nComp(), f.nGrow());
     stream<LatticeTag>(f, f_scratch, geom);
     amrex::MultiFab::Copy(f, f_scratch, 0, 0, f.nComp(), 0);
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
 }
 
 // ── Explicit instantiations ───────────────────────────────────────────────

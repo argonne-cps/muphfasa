@@ -9,6 +9,8 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_REAL.H>
 
+#include <LBM/Units.H>
+
 namespace muphfasa {
 
 class ISimulation
@@ -30,11 +32,10 @@ public:
 
     // BGK relaxation parameter actually in use (omega = 1/tau), derived from
     // UnitConverter::relaxationTime<LatticeTag>() -- see SimulationImpl's
-    // constructor. Exposed so callers (e.g. regression tests comparing
-    // against an analytic solution) can recover the lattice viscosity the
-    // simulation is actually running with instead of re-deriving it
-    // independently, which could silently drift from the real value.
+    // constructor.
     virtual amrex::Real omega() const noexcept = 0;
+    virtual const UnitConverter& units() const noexcept = 0;
+    virtual const amrex::Geometry& geom() const noexcept = 0;
 };
 
 } // namespace muphfasa
