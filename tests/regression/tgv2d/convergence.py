@@ -239,6 +239,7 @@ def plot_convergence(rows: list, plot_path: Path) -> None:
     ax.loglog(dx, err_vx, "o-", label="observed error (vx)")
     ax.loglog(dx, err_vy, "s-", label="observed error (vy)")
     ax.loglog(dx, ref, "k--", label="2nd-order reference")
+    ax.invert_xaxis()
     ax.set_xlabel("dx")
     ax.set_ylabel("abs error (inf-norm)")
     ax.set_title("TGV2D grid convergence")
