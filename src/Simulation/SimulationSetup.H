@@ -44,13 +44,14 @@ public:
 
     // Advance by one time step: collision -> streaming -> boundary conditions
     // -> macroscopic update.
-    void advance(int step) override;
+    void advanceFused(int step) override;
+    void advanceSep(int step) override;
 
     // Write plotfile and/or checkpoint when the output intervals are hit.
-    void writeOutput(int step) const override;
+    void writeOutput(int step) override;
 
     // ── State accessors ───────────────────────────────────────────────────
-    const amrex::MultiFab& f()   const noexcept override { return m_f;   }
+    const amrex::MultiFab& f()   const noexcept override { return m_fin;   }
     const amrex::MultiFab& rho() const noexcept override { return m_rho; }
     const amrex::MultiFab& vel() const noexcept override { return m_vel; }
 
@@ -72,7 +73,8 @@ private:
     amrex::DistributionMapping       m_dm;
 
     // ── Distribution function and macroscopic fields ──────────────────────
-    amrex::MultiFab m_f;    // distribution: LatticeTag::Q components
+    amrex::MultiFab m_fin;     // standard distribution: LatticeTag::Q components
+    amrex::MultiFab m_fout;    // output distribution in Fused: LatticeTag::Q components
     amrex::MultiFab m_feq;  // equilibrium:  LatticeTag::Q components (scratch)
     amrex::MultiFab m_rho;  // density:      1 component
     amrex::MultiFab m_vel;  // velocity:     AMREX_SPACEDIM components

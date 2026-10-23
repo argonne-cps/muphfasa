@@ -20,8 +20,9 @@ public:
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
     virtual void initialize() = 0;
-    virtual void advance(int step) = 0;
-    virtual void writeOutput(int step) const = 0;
+    virtual void advanceFused(int step) = 0;
+    virtual void advanceSep(int step) = 0;
+    virtual void writeOutput(int step) = 0;
 
     // ── State accessors ───────────────────────────────────────────────────
     virtual const amrex::MultiFab& f()   const noexcept = 0;

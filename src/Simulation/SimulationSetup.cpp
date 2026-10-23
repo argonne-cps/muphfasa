@@ -66,7 +66,8 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     m_dm   = m_geom_handler->distMap();
 
     // init multifabs
-    m_f.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
+    m_fin.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
+    m_fout.define  (m_ba, m_dm, LatticeTag::Q,  0);
     m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
     m_rho.define(m_ba, m_dm, 1,              0);
     m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
@@ -88,7 +89,24 @@ void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 }
 
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
+void SimulationImpl<LatticeTag, CollisionModel>::advanceFused(int step)
+{
+    BL_PROFILE("SimulationImpl::advanceFused()");
+
+    amrex::ignore_unused(step);
+
+    // fused stream then collide
+    pullCollideFullMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega);
+
+    // swap pointers
+    std::swap(m_fin, m_fout);
+
+    // fill ghost and stream
+    fillGhostCells();
+}
+
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::advanceSep(int step)
 {
     BL_PROFILE("SimulationImpl::advance()");
 
@@ -97,7 +115,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     // collide
     amrex::Real t0 = amrex::second();
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
-    collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_omega);
+    collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_omega);
     amrex::Real t1 = amrex::second();
     m_t_collide += t1 - t0;
 
@@ -106,12 +124,12 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     amrex::Real t2 = amrex::second();
     m_t_ghost += t2 - t1;
 
-    streamInPlace<LatticeTag>(m_f, m_geom);
+    streamInPlace<LatticeTag>(m_fin, m_geom);
     amrex::Real t3 = amrex::second();
     m_t_stream += t3 - t2;
 
     // compute macro
-    computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+    computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel);
     amrex::Real t4 = amrex::second();
     m_t_macro += t4 - t3;
 
@@ -121,11 +139,17 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
 }
 
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
+void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
 {
     BL_PROFILE("SimulationImpl::writeOutput()");
 
     if (step % m_params.plotInterval() == 0) {
+
+        // compute macroscopic NOTE: need to stream fstar_in first.
+        // This is kind of wasted computation
+        stream<LatticeTag>(m_fin, m_fout, m_geom);
+        computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
+
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         // Plotfiles are written in physical (SI) units; solver state stays lattice.
         const amrex::Real t_phys = m_units->toPhysicalTime(m_time);
@@ -146,7 +170,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step) const
 
     if (step % m_params.checkpointInterval() == 0) {
         const std::string cname = checkpointName(m_params.checkpointPrefix(), step);
-        writeCheckpoint(cname, m_f, m_geom, step, m_time);
+        writeCheckpoint(cname, m_fin, m_geom, step, m_time);
     }
 }
 
@@ -184,7 +208,7 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
     initData(m_rho, m_vel, *m_units);
-    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
+    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_fin);
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -193,10 +217,10 @@ void SimulationImpl<LatticeTag, CollisionModel>::fillGhostCells()
     BL_PROFILE("SimulationImpl::fillGhostCells()");
 
     // fill internal bounds/periodic
-    m_f.FillBoundary(m_geom.periodicity());
+    m_fin.FillBoundary(m_geom.periodicity());
 
     // fill physical bounds via BCManager<LatticeTag> (see buildBCManager())
-    (*m_phys_bc)(m_f, 0, m_f.nComp(), m_f.nGrowVect(), m_time, 0);
+    (*m_phys_bc)(m_fin, 0, m_fin.nComp(), m_fin.nGrowVect(), m_time, 0);
 
     // sync for profiling
     amrex::Gpu::streamSynchronize();
