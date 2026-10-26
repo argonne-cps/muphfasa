@@ -34,12 +34,24 @@ amrex::Vector<amrex::BCRec> makeBCRecVector(
 }
 
 bool hasConflictingBC(const amrex::Vector<lbmBCtype>& face_types) noexcept {
+    bool conflict = false;
+
+    // check inflow/outflow
     bool has_inflow = false, has_outflow = false;
     for (auto t : face_types) {
         if (t == lbmBCtype::Inflow) has_inflow = true;
         if (t == lbmBCtype::Outflow) has_outflow = true;
     }
-    return has_inflow && has_outflow;
+    conflict = has_inflow && has_outflow;
+
+    // check two moving walls (currently not supported)
+    int nMoving = 0;
+    for (auto t : face_types) {
+        if (t == lbmBCtype::MovingWall) nMoving++;
+    }
+    if (nMoving > 1) conflict = true;
+
+    return conflict;
 }
 
 ResolvedFaceBC resolveBC(
@@ -49,7 +61,7 @@ ResolvedFaceBC resolveBC(
     const amrex::Vector<std::string>& face_names)
 {
     if (hasConflictingBC(face_types)) {
-        std::string msg = "resolveBC: conflicting Inflow and Outflow at same edge/corner (faces:";
+        std::string msg = "resolveBC: conflicting bound conditions at same edge/corner (faces:";
         for (size_t i = 0; i < face_names.size(); ++i) msg += " " + face_names[i];
         msg += ")";
         amrex::Abort(msg);
