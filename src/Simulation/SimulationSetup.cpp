@@ -67,7 +67,7 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
 
     // init multifabs
     m_fin.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
-    m_fout.define  (m_ba, m_dm, LatticeTag::Q,  0);
+    m_fout.define  (m_ba, m_dm, LatticeTag::Q,   LatticeTag::nGhost);
     m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
     m_rho.define(m_ba, m_dm, 1,              0);
     m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
