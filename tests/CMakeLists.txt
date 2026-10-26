@@ -35,6 +35,8 @@ set(UNIT_TEST_NAMES
     test_macroscopic
     test_equilibrium
     test_units
+    test_bc_corners
+    test_mass_conservation
 )
 
 foreach(test_name IN LISTS UNIT_TEST_NAMES)
@@ -99,3 +101,4 @@ endfunction()
 
 add_regression_analysis_test(couette)
 add_regression_analysis_test(tgv2d ${CMAKE_CURRENT_SOURCE_DIR}/regression/tgv2d/InitData.cpp)
+add_regression_analysis_test(lid2d)
