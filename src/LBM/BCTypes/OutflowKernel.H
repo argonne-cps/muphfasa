@@ -17,7 +17,6 @@
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
 
-#include "BCCommon.H"
 
 namespace muphfasa {
 
@@ -30,10 +29,11 @@ struct OutflowKernel
                        const amrex::Box& domain) noexcept
     {
         for (int n = 0; n < LatticeTag::Q; ++n) {
-            amrex::IntVect c = cvec<LatticeTag>(n);
-            if (!neededPop(iv, c, domain)) continue;
-            amrex::IntVect src = iv + c;
-            f(iv, n) = f(src, n);
+            amrex::IntVect c = amrex::IntVect{AMREX_D_DECL(LatticeTag::cx(n), LatticeTag::cy(n), LatticeTag::cz(n))};
+            const amrex::IntVect src = iv + c;
+            if (domain.contains(src) && f.contains(src)) {
+                f(iv, n) = f(src, n);
+            }
         }
     }
 };
