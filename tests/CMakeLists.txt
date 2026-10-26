@@ -37,6 +37,7 @@ set(UNIT_TEST_NAMES
     test_units
     test_bc_corners
     test_mass_conservation
+    test_inflow_profile
 )
 
 foreach(test_name IN LISTS UNIT_TEST_NAMES)
@@ -66,7 +67,7 @@ function(add_regression_test name)
 endfunction()
 
 add_regression_test(poiseuille)
-add_regression_test(lid_driven_cavity)
+add_regression_test(lid2d)
 
 # Regression tests that need their own analysis code (e.g. comparing against
 # an analytic solution) instead of just checking the solver runs to
