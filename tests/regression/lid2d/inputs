@@ -1,0 +1,41 @@
+# Correctness test: 2-D lid-driven cavity, global checks + Ghia centerline extrema.
+# Same physics as ../inputs.bench (closed square cavity, Re=100, lid at y=hi);
+# test_lid2d.cpp runs it from rest to steady state and checks mass conservation,
+# KE spin-up/plateau, steady-state power balance and Ghia et al. (1982) values
+# (see README.md).
+
+# ── Grid ──────────────────────────────────────────────────────────────────
+grid.ncells      = 64 64
+grid.max_grid_size = 64
+grid.n_ghost     = 1
+
+# ── Simulation ───────────────────────────────────────────────────────────
+# Run to steady state; amr.plot_int doubles as the diagnostic sampling interval.
+sim.max_step     = 20000
+sim.stop_time    = -1.0
+
+# ── LBM ──────────────────────────────────────────────────────────────────
+lbm.lattice_type = D2Q9
+lbm.tau          = 0.692  # Re=100, U_lat=0.1, N=64
+
+# ── Physical units ─────────────────────────────────────────────────────────
+# With lbm.tau pinned, u_lat = nu_lat*Re/N = 0.1 at N=64 (see ../inputs.bench).
+units.ref_length    = 1.0
+units.ref_velocity  = 0.05
+units.ref_density   = 1.0
+units.Re            = 100.0
+
+# ── Boundary conditions ────────────────────────────────────────────────────
+bc.lo_type = NoSlip  NoSlip
+bc.hi_type = NoSlip  MovingWall
+bc.hiy_Uwall = 0.05  0.0   # physical units, = units.ref_velocity
+
+# ── Geometry ───────────────────────────────────────────────────────────────
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 1.0  1.0
+
+# ── Output ─────────────────────────────────────────────────────────────────
+amr.plot_int        = 1000
+amr.chk_int         = 20001   # only step 0 writes a checkpoint
+amr.plot_file       = plt
+amr.check_file      = chk
