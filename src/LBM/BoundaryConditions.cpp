@@ -1,11 +1,4 @@
-// BoundaryConditions.cpp — Explicit instantiations for BCManager<LatticeTag>.
-//
-// BCManager is a header-only template (all of operator()/setFaceBC must be
-// visible to AMReX's GpuBndryFuncFab at the call site, and operator() must be
-// inlineable for GPU builds), so there is nothing to implement out-of-line
-// here. These instantiations exist purely to catch lattice-specific compile
-// errors early, mirroring the explicit-instantiation pattern used elsewhere
-// in src/LBM/.
+// BoundaryConditions.cpp — Explicit instantiations and resolveBC impl.
 
 #include "BoundaryConditions.H"
 #include "LatticeDescriptor.H"
@@ -21,7 +14,7 @@ lbmBCtype parselbmBCtype(const std::string& name)
     amrex::Abort("parselbmBCtype: unrecognized BC name \"" + name +
                  "\" (expected MovingWall, NoSlip, Inflow, or Outflow; Periodic faces "
                  "must be filtered out before calling this)");
-    return lbmBCtype::NoSlip; // unreachable
+    return lbmBCtype::NoSlip;
 }
 
 amrex::Vector<amrex::BCRec> makeBCRecVector(
@@ -33,11 +26,118 @@ amrex::Vector<amrex::BCRec> makeBCRecVector(
         const std::string& hi_name = names[faceIndex(dir, 1)];
 
         bcr.setLo(dir, (lo_name == "Periodic") ? amrex::BCType::int_dir
-                                                : kCustomBCSentinel);
+                                               : kCustomBCSentinel);
         bcr.setHi(dir, (hi_name == "Periodic") ? amrex::BCType::int_dir
-                                                : kCustomBCSentinel);
+                                               : kCustomBCSentinel);
     }
     return amrex::Vector<amrex::BCRec>(ncomp, bcr);
+}
+
+bool hasConflictingBC(const amrex::Vector<lbmBCtype>& face_types) noexcept {
+    bool has_inflow = false, has_outflow = false;
+    for (auto t : face_types) {
+        if (t == lbmBCtype::Inflow) has_inflow = true;
+        if (t == lbmBCtype::Outflow) has_outflow = true;
+    }
+    return has_inflow && has_outflow;
+}
+
+ResolvedFaceBC resolveBC(
+    const amrex::Vector<lbmBCtype>& face_types,
+    const amrex::Vector<amrex::Real>& face_rho,
+    const amrex::Vector<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>>& face_U,
+    const amrex::Vector<std::string>& face_names)
+{
+    if (hasConflictingBC(face_types)) {
+        std::string msg = "resolveBC: conflicting Inflow and Outflow at same edge/corner (faces:";
+        for (size_t i = 0; i < face_names.size(); ++i) msg += " " + face_names[i];
+        msg += ")";
+        amrex::Abort(msg);
+    }
+
+    // Find max rank
+    int max_rank = -1;
+    for (auto t : face_types) max_rank = std::max(max_rank, bcRank(t));
+
+    lbmBCtype winner{};
+    for (auto t : face_types) if (bcRank(t) == max_rank) { winner = t; break; }
+
+    // Average rho and U over faces of winning type only
+    amrex::Real sum_rho = 0;
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> sum_U{AMREX_D_DECL(0.,0.,0.)};
+    int count = 0;
+    for (size_t i = 0; i < face_types.size(); ++i) {
+        if (face_types[i] == winner) {
+            sum_rho += face_rho[i];
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) sum_U[d] += face_U[i][d];
+            ++count;
+        }
+    }
+    ResolvedFaceBC out;
+    out.type = winner;
+    if (count > 0) {
+        out.rho = sum_rho / count;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) out.U[d] = sum_U[d] / count;
+    }
+    return out;
+}
+
+template <typename LatticeTag>
+void BCManager<LatticeTag>::finalize()
+{
+    // Initialize all resolved entries to Periodic — purely-periodic ghosts
+    // are never looked up (operator() zeroes periodic dims) and purely-periodic
+    // codes should remain Periodic, not NoSlip.
+    for (int i = 0; i < detail::numCodes(); ++i) {
+        m_resolved[i].type = lbmBCtype::Periodic;
+        m_resolved[i].rho = 1.0;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) m_resolved[i].U[d] = 0;
+    }
+
+    // Enumerate codes
+    // For each dim, code[d] in {-1,0,1}
+    int total = detail::numCodes();
+    for (int idx = 0; idx < total; ++idx) {
+        // Decode idx to code
+        amrex::IntVect code{AMREX_D_DECL(0,0,0)};
+        int tmp = idx;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            code[d] = (tmp % 3) - 1;
+            tmp /= 3;
+        }
+        bool all_zero = true;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) if (code[d] != 0) all_zero = false;
+        if (all_zero) continue;
+
+        // Gather faces for nonzero dims, skipping Periodic faces (mirrors
+        // operator()'s zeroing of periodic dims; e.g. a corner with one
+        // periodic side resolves to the remaining wall face).
+        amrex::Vector<lbmBCtype> types;
+        amrex::Vector<amrex::Real> rhos;
+        amrex::Vector<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>> Us;
+        amrex::Vector<std::string> names;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            if (code[d] != 0) {
+                int fi = faceIndex(d, code[d]);
+                if (m_face_bc[fi] == lbmBCtype::Periodic) continue;
+                types.push_back(m_face_bc[fi]);
+                rhos.push_back(m_face_rho_wall[fi]);
+                Us.push_back(m_face_vel[fi]);
+                // name for error message
+                std::string nm = (code[d] < 0 ? "lo" : "hi");
+                nm = std::string("d")+std::to_string(d)+nm;
+                names.push_back(nm);
+            }
+        }
+        // If all contributing faces were periodic, leave as Periodic
+        // (purely periodic ghost — FillBoundary handled it).
+        if (types.empty()) continue;
+
+        ResolvedFaceBC r = resolveBC(types, rhos, Us, names);
+        m_resolved[idx].type = r.type;
+        m_resolved[idx].rho = r.rho;
+        m_resolved[idx].U = r.U;
+    }
 }
 
 #if (AMREX_SPACEDIM == 2)

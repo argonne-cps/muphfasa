@@ -3,82 +3,51 @@
 // MovingWallKernel, and InflowKernel, each of which is a thin wrapper that
 // just fixes rho/U (see those files).
 //
-// The wall/face sits halfway between the last fluid node x and the first
-// ghost node g = x + bound*e_dir (bound = -1 for a lo-`dir` face, +1 for a
-// hi-`dir` face). This kernel is only ever invoked by AMReX for ghost cells
-// so `iv` below is always such a `g`.
+// The wall/face sits halfway between the last fluid node x_f and the first
+// ghost node g. For streaming (pull) the fluid cell x_f = g + c_n is the one
+// that reads f(g, n), so the correct halfway bounce-back (Kruger et al.,
+// ch. 5) is:
 //
-// We want the ghost cell to hold, for every population n whose velocity
-// points into the face along `dir` (c_n[dir] == -bound, i.e. n would stream
-// out of the domain), the opposite-direction population already sitting in
-// the adjacent fluid cell x = g - bound*e_dir (pre-stream), plus a momentum
-// correction for the prescribed velocity U:
+//     f(g, n) = f(g + c_n, opposite(n)) + contrib(opposite(n))
 //
-//     f(g, n) = f(x, opposite(n)) + contrib(opposite(n))
-//
-// where,
+// where g + c_n is the interior source cell (inside geom.Domain()) and
 //     contrib(m) = -2 * rho * weight(m) * sum_i (c_i(m) * U_i) / cs2
 //
-// (Kruger et al., "The Lattice Boltzmann Method", ch. 5.) The sum runs over
-// every spatial component, including the one along `dir` — so U may carry a
-// component normal to the face (as InflowKernel needs) as well as tangential
-// components (as MovingWallKernel needs); passing U=0 reduces this to plain
-// halfway bounce-back (NoSlipKernel).
+// This holds for all populations n "needed" by streaming, i.e. where
+// g + c_n is inside the domain. The older face-neighbour form
+// f(g - bound*e_dir, opp) was only correct for axis-aligned n; diagonal n
+// require the tangential shift g + c_n as well.
 
 #ifndef MUPHFASA_BOUNCEBACK_KERNEL_H
 #define MUPHFASA_BOUNCEBACK_KERNEL_H
 
 #include <AMReX_Array4.H>
+#include <AMReX_Box.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
+
+#include "BCCommon.H"
 
 namespace muphfasa {
 
 template <typename LatticeTag>
 struct BounceBack
 {
-    // dir: face normal (0=x, 1=y, 2=z). bound: -1 for the lo face, +1 for
-    // the hi face. iv is the ghost cell being filled.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void apply(const amrex::IntVect& iv,
                        amrex::Array4<amrex::Real> const& f,
-                       int dir, int bound,
+                       const amrex::Box& domain,
                        amrex::Real rho,
                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> U
                        ) noexcept
     {
         for (int n = 0; n < LatticeTag::Q; ++n) {
-#if (AMREX_SPACEDIM == 2)
-            if (dir == 0) {
-                if (LatticeTag::cx(n) == -bound) {
-                    int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0]-bound, iv[1], opp_n) + contrib(opp_n, rho, U);
-                }
-            } else if (dir == 1) {
-                if (LatticeTag::cy(n) == -bound) {
-                    int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1]-bound, opp_n) + contrib(opp_n, rho, U);
-                }
-            }
-#else
-            if (dir == 0) {
-                if (LatticeTag::cx(n) == -bound) {
-                    int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0]-bound, iv[1], iv[2], opp_n) + contrib(opp_n, rho, U);
-                }
-            } else if (dir == 1) {
-                if (LatticeTag::cy(n) == -bound) {
-                    int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1]-bound, iv[2], opp_n) + contrib(opp_n, rho, U);
-                }
-            } else if (dir == 2) {
-                if (LatticeTag::cz(n) == -bound) {
-                    int opp_n = LatticeTag::opposite(n);
-                    f(iv, n) = f(iv[0], iv[1], iv[2]-bound, opp_n) + contrib(opp_n, rho, U);
-                }
-            }
-#endif
+            amrex::IntVect c = cvec<LatticeTag>(n);
+            if (!neededPop(iv, c, domain)) continue;
+            int opp_n = LatticeTag::opposite(n);
+            amrex::IntVect src = iv + c;
+            f(iv, n) = f(src, opp_n) + contrib(opp_n, rho, U);
         }
     }
 
@@ -93,6 +62,6 @@ struct BounceBack
     }
 };
 
-}
+} // namespace muphfasa
 
 #endif //MUPHFASA_BOUNCEBACK_KERNEL_H

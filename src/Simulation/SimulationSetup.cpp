@@ -235,6 +235,10 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                     bc_manager.setFaceVel(dir, bound, Uwall[2*dir]);
                 else if (bound == 1)
                     bc_manager.setFaceVel(dir, bound, Uwall[2*dir+1]);
+            } else if (name == "NoSlip") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
             } else if (name == "Inflow") {
                 // reuses the reference density as rho_in; see InputParser::Uinflow()
                 bc_manager.setFaceDensity(dir, bound, rhoWall);
@@ -242,9 +246,14 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir]);
                 else if (bound == 1)
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir+1]);
+            } else if (name == "Outflow") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
             }
         }
     }
+    bc_manager.finalize();
 
     amrex::Vector<amrex::BCRec> bcs = makeBCRecVector(names, LatticeTag::Q);
 
