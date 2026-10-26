@@ -1,7 +1,7 @@
-# GNUmakefile for the lid-driven cavity 2-D correctness test (benchmarks/lid2d/validate/).
-# Uses the default quiescent InitData.cpp from external/muphfasa (cavity starts from rest).
+# GNUmakefile for the lid-driven cavity 2-D correctness test (tests/regression/lid2d/).
+# Uses the default quiescent InitData.cpp from src/Simulation/InitData.cpp (cavity starts from rest).
 
-TOP := ../../../external/muphfasa
+TOP := ../../..
 
 DIM ?= 2
 
