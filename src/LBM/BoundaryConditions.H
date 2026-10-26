@@ -5,7 +5,6 @@
 // Ghost population rule: for ghost g, population n is needed iff g + c_n is
 // inside geom.Domain(); source cell is g + c_n; BounceBack: f(g,n)=f(src,opp)+contrib,
 // Outflow: f(g,n)=f(src,n). This covers faces, edges, and corners uniformly
-// and correctly handles diagonal populations.
 //
 // Priority resolution at edges/corners: NoSlip(3) > MovingWall(2) > Inflow(1) > Outflow(0).
 // Winner type among touching faces determines BC; rho/U are averaged over
@@ -50,23 +49,20 @@ static_assert(kCustomBCSentinel != amrex::BCType::int_dir &&
 
 // ── helpers for 3^D resolved BC indexing ────────────────────────────────
 namespace detail {
-inline constexpr int pow3(int d) noexcept {
-    int r = 1;
-    for (int i = 0; i < d; ++i) r *= 3;
-    return r;
-}
 inline constexpr int numCodes() noexcept {
-#if AMREX_SPACEDIM == 2
+#if (AMREX_SPACEDIM == 2)
     return 9;
 #else
     return 27;
 #endif
 }
+
+// get index of m_resolved_bc for ghost cell
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int ghostClass(const amrex::IntVect& code) noexcept {
     int idx = 0;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        idx += (code[d] + 1) * pow3(d);
+        idx += (code[d] + 1) * std::pow(3, d);
     }
     return idx;
 }
