@@ -9,6 +9,7 @@
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
+#include <AMReX_PhysBCFunct.H>
 #include <AMReX_Print.H>
 
 #include "LBM/BoundaryConditions.H"
@@ -18,7 +19,9 @@
 
 #include <cmath>
 #include <limits>
+#include <array>
 #include <random>
+#include <string>
 #include <stdexcept>
 
 using namespace muphfasa;
@@ -31,21 +34,6 @@ static amrex::Geometry makeGeom(const amrex::Box& domain)
     geom.define(domain, rb, amrex::CoordSys::cartesian, per);
     return geom;
 }
-
-static amrex::BCRec makeBCRecAllWall()
-{
-    amrex::BCRec bcr;
-    for (int d=0; d<AMREX_SPACEDIM; ++d) {
-        bcr.setLo(d, kCustomBCSentinel);
-        bcr.setHi(d, kCustomBCSentinel);
-    }
-    return bcr;
-}
-
-static BCManager<D2Q9> makeBCM2D();
-static BCManager<D3Q15> makeBCM3D15();
-static BCManager<D3Q19> makeBCM3D19();
-static BCManager<D3Q27> makeBCM3D27();
 
 // Generic helpers templated on LatticeTag
 template <typename LatticeTag>
@@ -87,32 +75,6 @@ static void fillRandomF(amrex::MultiFab& mf, std::mt19937& rng)
 }
 
 template <typename LatticeTag>
-static void applyBC(amrex::MultiFab& mf, const amrex::Geometry& geom,
-                    const BCManager<LatticeTag>& bcm, const amrex::BCRec& bcr)
-{
-    const amrex::Box& domain = geom.Domain();
-    const amrex::BCRec* bcr_ptr = &bcr;
-    for (amrex::MFIter mfi(mf); mfi.isValid(); ++mfi) {
-        auto arr = mf.array(mfi);
-        const amrex::Box fbox = mfi.fabbox();
-        const auto lo=fbox.smallEnd(), hi=fbox.bigEnd();
-#if AMREX_SPACEDIM==2
-        for (int j=lo[1]; j<=hi[1]; ++j) for (int i=lo[0]; i<=hi[0]; ++i) {
-            amrex::IntVect iv{AMREX_D_DECL(i,j,0)};
-            if (domain.contains(iv)) continue;
-            bcm(iv, arr, 0, LatticeTag::Q, geom.data(), 0.0, bcr_ptr, 0, 0);
-        }
-#else
-        for (int k=lo[2]; k<=hi[2]; ++k) for (int j=lo[1]; j<=hi[1]; ++j) for (int i=lo[0]; i<=hi[0]; ++i) {
-            amrex::IntVect iv{AMREX_D_DECL(i,j,k)};
-            if (domain.contains(iv)) continue;
-            bcm(iv, arr, 0, LatticeTag::Q, geom.data(), 0.0, bcr_ptr, 0, 0);
-        }
-#endif
-    }
-}
-
-template <typename LatticeTag>
 static BCManager<LatticeTag> makeAllNoSlipBCM()
 {
     BCManager<LatticeTag> bcm;
@@ -141,8 +103,13 @@ static void testMassConservation(const char* tag, amrex::Box domain, int max_gri
     std::mt19937 rng(12345);
     fillRandomF<LatticeTag>(f, rng);
 
-    auto bcm = makeAllNoSlipBCM<LatticeTag>();
-    auto bcr = makeBCRecAllWall();
+    // Drive the BC through the same PhysBCFunct/GpuBndryFuncFab path as the solver,
+    // so per-box BCRec handling (amrex::setBC marks inter-box faces int_dir) is covered.
+    std::array<std::string, 2 * AMREX_SPACEDIM> names;
+    names.fill("NoSlip");
+    amrex::GpuBndryFuncFab<BCManager<LatticeTag>> gpu_bndry_func(makeAllNoSlipBCM<LatticeTag>());
+    amrex::PhysBCFunct<amrex::GpuBndryFuncFab<BCManager<LatticeTag>>> phys_bc(
+        geom, makeBCRecVector(names, LatticeTag::Q), gpu_bndry_func);
 
     // omega = 1.0 (tau=1) — BGK conserves mass exactly per cell
     const amrex::Real omega = 1.0;
@@ -183,7 +150,7 @@ static void testMassConservation(const char* tag, amrex::Box domain, int max_gri
 
         // fill ghosts: FillBoundary for interior, then BC
         f.FillBoundary(geom.periodicity());
-        applyBC<LatticeTag>(f, geom, bcm, bcr);
+        phys_bc(f, 0, LatticeTag::Q, f.nGrowVect(), 0.0, 0);
 
         // stream: f -> f2 via pull, then copy back
         // Use default_stream per tile
