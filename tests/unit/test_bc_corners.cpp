@@ -10,8 +10,11 @@
 #include <AMReX_MultiFab.H>
 #include <AMReX_Print.H>
 
+#include <AMReX_FArrayBox.H>
+#include <AMReX_Loop.H>
+
 #include "LBM/BoundaryConditions.H"
-#include "LBM/BCTypes/BCCommon.H"
+#include "LBM/Equilibrium.H"
 #include "LBM/LatticeDescriptor.H"
 
 #include <cmath>
@@ -20,6 +23,17 @@
 #include <stdexcept>
 
 using namespace muphfasa;
+
+// Lattice velocity as IntVect (was in the removed BCTypes/BCCommon.H).
+template <typename LatticeTag>
+static amrex::IntVect cvec(int n)
+{
+#if (AMREX_SPACEDIM == 2)
+    return amrex::IntVect{AMREX_D_DECL(LatticeTag::cx(n), LatticeTag::cy(n), 0)};
+#else
+    return amrex::IntVect{AMREX_D_DECL(LatticeTag::cx(n), LatticeTag::cy(n), LatticeTag::cz(n))};
+#endif
+}
 
 static amrex::Geometry makeGeometry(const amrex::Box& domain,
                                     const amrex::IntVect& is_periodic_iv)
@@ -319,10 +333,68 @@ static void testPriorityTable()
     amrex::Print() << "    priority table (resolveBC)...\n";
     auto makeU=[&](double x,double y){ amrex::GpuArray<amrex::Real,AMREX_SPACEDIM> u{AMREX_D_DECL(0.,0.,0.)}; u[0]=x; if constexpr(AMREX_SPACEDIM>=2) u[1]=y; return u; };
     { amrex::Vector<lbmBCtype> t{lbmBCtype::NoSlip,lbmBCtype::MovingWall}; amrex::Vector<amrex::Real> r{1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0,0),makeU(0.1,0)}; auto rr=resolveBC(t,r,U,{"xlo","yhi"}); if(rr.type!=lbmBCtype::NoSlip) throw std::runtime_error("NoSlip beats MW"); if(std::abs(rr.U[0])>1e-12) throw std::runtime_error("U should be 0"); }
-    { amrex::Vector<lbmBCtype> t{lbmBCtype::MovingWall,lbmBCtype::MovingWall}; amrex::Vector<amrex::Real> r{1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0.1,0),makeU(0,0.2)}; auto rr=resolveBC(t,r,U,{"ylo","yhi"}); if(rr.type!=lbmBCtype::MovingWall) throw std::runtime_error("MW+MW"); if(std::abs(rr.U[0]-0.05)>1e-12||std::abs(rr.U[1]-0.1)>1e-12) throw std::runtime_error("avg fail"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::MovingWall,lbmBCtype::MovingWall}; if(!hasConflictingBC(t)) throw std::runtime_error("connected MovingWalls must conflict"); }
     { amrex::Vector<lbmBCtype> t{lbmBCtype::Inflow,lbmBCtype::Outflow}; if(!hasConflictingBC(t)) throw std::runtime_error("conflict"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::Inflow,lbmBCtype::PressureOutlet}; if(!hasConflictingBC(t)) throw std::runtime_error("Inflow+PressureOutlet conflict"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::Outflow,lbmBCtype::PressureOutlet}; if(!hasConflictingBC(t)) throw std::runtime_error("Outflow+PressureOutlet conflict"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::NoSlip,lbmBCtype::PressureOutlet}; if(hasConflictingBC(t)) throw std::runtime_error("NoSlip+PressureOutlet must not conflict"); amrex::Vector<amrex::Real> r{1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0,0),makeU(0,0)}; auto rr=resolveBC(t,r,U,{"ylo","xhi"}); if(rr.type!=lbmBCtype::NoSlip) throw std::runtime_error("NoSlip beats PressureOutlet"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::Inflow,lbmBCtype::PressureOutlet}; (void)t; amrex::Vector<lbmBCtype> t2{lbmBCtype::MovingWall,lbmBCtype::PressureOutlet}; amrex::Vector<amrex::Real> r{1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0.1,0),makeU(0,0)}; auto rr=resolveBC(t2,r,U,{"ylo","xhi"}); if(rr.type!=lbmBCtype::MovingWall) throw std::runtime_error("MovingWall beats PressureOutlet"); }
     { amrex::Vector<lbmBCtype> t{lbmBCtype::NoSlip,lbmBCtype::MovingWall,lbmBCtype::Outflow}; amrex::Vector<amrex::Real> r{1,1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0,0),makeU(0.1,0),makeU(0,0)}; auto rr=resolveBC(t,r,U,{"xlo","ylo","zlo"}); if(rr.type!=lbmBCtype::NoSlip) throw std::runtime_error("3-face NoSlip"); }
-    { amrex::Vector<lbmBCtype> t{lbmBCtype::MovingWall,lbmBCtype::MovingWall,lbmBCtype::MovingWall}; amrex::Vector<amrex::Real> r{1,1,1}; amrex::Vector<amrex::GpuArray<amrex::Real,AMREX_SPACEDIM>> U{makeU(0.1,0),makeU(0.2,0),makeU(0.3,0)}; auto rr=resolveBC(t,r,U,{"xlo","ylo","zlo"}); if(std::abs(rr.U[0]-0.2)>1e-12) throw std::runtime_error("3MW avg"); }
+    { amrex::Vector<lbmBCtype> t{lbmBCtype::MovingWall,lbmBCtype::MovingWall,lbmBCtype::MovingWall}; if(!hasConflictingBC(t)) throw std::runtime_error("3 connected MovingWalls must conflict"); }
+    amrex::Print() << "      [PASS]\n";
+}
+
+
+// PressureOutlet: a uniform equilibrium state at rho_out must give an
+// equilibrium ghost cell (anti-bounce-back of feq(rho,u) with rho = rho_out is
+// feq(rho,u) again), and for rho != rho_out the even part of each opposite
+// pair is pinned to the rho_out equilibrium, so the face density is rho_out.
+template <typename LatticeTag>
+static void testPressureOutletKernel()
+{
+    amrex::Print() << "    PressureOutlet kernel...\n";
+    using Vec = amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>;
+    auto feq = [](amrex::Real rho, const Vec& u, int n) {
+#if AMREX_SPACEDIM==2
+        return computeEquilibriumCell2D<LatticeTag>(rho, u, n);
+#else
+        return computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+#endif
+    };
+
+    const amrex::Box domain(amrex::IntVect(0), amrex::IntVect(AMREX_D_DECL(3, 3, 3)));
+    const amrex::Box fbox = amrex::grow(domain, 1);
+    amrex::FArrayBox fab(fbox, LatticeTag::Q);
+    auto f = fab.array();
+
+    Vec u{AMREX_D_DECL(0.03, -0.02, 0.01)};
+    const amrex::Real rho_out = 1.0;
+    // ghost cell on the x-hi face (middle of the face)
+    const amrex::IntVect g{AMREX_D_DECL(4, 1, 1)};
+
+    for (const amrex::Real rho : {amrex::Real(1.0), amrex::Real(1.15)}) {
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+            amrex::LoopOnCpu(domain, [&](int i, int j, int k) { f(i, j, k, n) = feq(rho, u, n); });
+            f(g, n) = std::numeric_limits<amrex::Real>::quiet_NaN();
+        }
+        PressureOutletKernel<LatticeTag>::apply(g, f, domain, rho_out);
+
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+            const amrex::IntVect c = cvec<LatticeTag>(n);
+            const amrex::IntVect src = g + c;
+            if (!domain.contains(src)) { continue; }
+            const amrex::Real got = f(g, n);
+            if (rho == rho_out) {
+                if (std::abs(got - feq(rho_out, u, n)) > 1e-14) { throw std::runtime_error("PressureOutlet: ghost is not equilibrium"); }
+            } else {
+                const int opp = LatticeTag::opposite(n);
+                // even part of the pair equals the rho_out equilibrium's even part
+                const amrex::Real even_pair = got + f(src, opp);
+                const amrex::Real even_ref  = feq(rho_out, u, n) + feq(rho_out, u, opp);
+                if (std::abs(even_pair - even_ref) > 1e-13) { throw std::runtime_error("PressureOutlet: even part not pinned to rho_out"); }
+            }
+        }
+    }
     amrex::Print() << "      [PASS]\n";
 }
 
@@ -332,6 +404,7 @@ template <typename LatticeTag> void runForLattice(const char* name){
     testCoveragePeriodicX<LatticeTag>();
     testCoverageTwoBoxes<LatticeTag>();
     testSourceCell<LatticeTag>();
+    testPressureOutletKernel<LatticeTag>();
 }
 
 int main(int argc,char* argv[]){
