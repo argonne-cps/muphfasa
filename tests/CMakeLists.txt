@@ -106,8 +106,13 @@ function(add_regression_analysis_test name)
 endfunction()
 
 add_regression_analysis_test(couette)
-add_regression_analysis_test(tgv2d ${CMAKE_CURRENT_SOURCE_DIR}/regression/tgv2d/InitData.cpp)
-add_regression_analysis_test(lid2d)
+# tgv2d and lid2d are inherently 2D (D2Q9 inputs), so they are 2D-build only.
+if(muphfasa_DIM EQUAL 2)
+    add_regression_analysis_test(tgv2d ${CMAKE_CURRENT_SOURCE_DIR}/regression/tgv2d/InitData.cpp)
+    add_regression_analysis_test(lid2d)
+else()
+    message(STATUS "Skipping 2D-only regression tests (tgv2d, lid2d) in a ${muphfasa_DIM}D build")
+endif()
 add_regression_analysis_test(poiseuille)
 # Same executable, inflow / PressureOutlet configuration (inputs_inflow in 2D,
 # inputs3d_inflow in 3D).

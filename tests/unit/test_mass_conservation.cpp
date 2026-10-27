@@ -8,9 +8,9 @@
 //   for (step) { sim->advance(step); sim->writeOutput(step); }
 // Here we exercise the same ISimulation::advance() path (collide -> FillBoundary
 // -> BC -> stream -> macroscopic) instead of hand-rolling collide/stream in
-// the test. Only single-box configurations are exercised; the multi-box
-// (max_grid_size < domain) case has known bugs and will be re-enabled after
-// the bounce-back corner fix.
+// the test. Both single-box and multi-box (max_grid_size < domain) layouts are
+// exercised: multi-box guards against wall BCs being skipped for boxes that
+// touch the domain boundary on one side and a neighbour box on the other.
 
 #include <AMReX.H>
 #include <AMReX_MultiFab.H>
@@ -188,11 +188,11 @@ int main(int argc, char* argv[])
                                 std::vector<int>{6, 6, 6}, 64, "D3Q19");
         runMassConservationTest("D3Q27 single-box 6x6x6",
                                 std::vector<int>{6, 6, 6}, 64, "D3Q27");
-        runMassConservationTest("D3Q15 multi-box 6x6x6",
+        runMassConservationTest("D3Q15 multi-box 8x8x8",
                                 std::vector<int>{8, 8, 8}, 4, "D3Q15");
-        runMassConservationTest("D3Q19 multi-box 6x6x6",
+        runMassConservationTest("D3Q19 multi-box 8x8x8",
                                 std::vector<int>{8, 8, 8}, 4, "D3Q19");
-        runMassConservationTest("D3Q27 multi-box 6x6x6",
+        runMassConservationTest("D3Q27 multi-box 8x8x8",
                                 std::vector<int>{8, 8, 8}, 4, "D3Q27");
 #endif
         amrex::Print() << "All mass conservation tests passed.\n";

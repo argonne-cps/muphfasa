@@ -125,7 +125,7 @@ public:
                      const int bcomp,
                      const int orig_comp) const
     {
-        amrex::ignore_unused(dcomp, numcomp, time, orig_comp);
+        amrex::ignore_unused(dcomp, numcomp, time, bcr, bcomp, orig_comp);
 
         const amrex::Box& domain = geom.Domain();
 
@@ -138,8 +138,9 @@ public:
             else if (iv[d] > dom_hi[d]) code[d] = 1;
             else code[d] = 0;
             // Periodic dims are not walls: FillBoundary already filled them.
-            if (bcr[bcomp].lo(d) == amrex::BCType::int_dir ||
-                bcr[bcomp].hi(d) == amrex::BCType::int_dir) {
+            // Use the geometry, not bcr: PhysBCFunct hands us a per-box BCRec
+            // where sides interior to the domain are int_dir.
+            if (geom.isPeriodic(d)) {
                 code[d] = 0;
             }
         }
