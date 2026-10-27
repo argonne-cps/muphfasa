@@ -186,7 +186,7 @@ int main(int argc, char* argv[])
         amrex::Real final_err = 0.0;
 
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceSep(step);
+            sim->advanceFused(step);
             sim->writeOutput(step);
 
             if (step % params.plotInterval() == 0 || step == max_step) {

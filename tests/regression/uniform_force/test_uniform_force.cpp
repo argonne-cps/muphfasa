@@ -4,7 +4,7 @@
 // With a quiescent start (reported u = 0; f is built from feq(rho, -F/(2 rho))
 // by setInitialConditions) in a spatially uniform, fully periodic domain, the Guo scheme adds exactly F to the momentum
 // Sum(c f) every step regardless of omega (relaxation contributes omega*F/2,
-// the force term (1 - omega/2)*F). After k advanceSep() calls the reported
+// the force term (1 - omega/2)*F). After k advanceFused() calls the reported
 // (half-force corrected) velocity is therefore exactly
 //     u_k = k * F / rho,     rho_k = rho_0,
 // and the field stays spatially uniform. Checked every step to round-off.
@@ -52,8 +52,8 @@ int main(int argc, char* argv[])
         amrex::Real worst_u = 0, worst_spread = 0, worst_rho = 0;
         const int max_step = params.maxStep();
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceSep(step);
-            const int k = step + 1;  // advanceSep() calls so far
+            sim->advanceFused(step);
+            const int k = step + 1;  // advanceFused() calls so far
 
             const amrex::MultiFab& vel = sim->vel();
             const amrex::MultiFab& rho = sim->rho();

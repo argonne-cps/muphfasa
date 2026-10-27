@@ -81,7 +81,7 @@ int main(int argc, char* argv[])
 
         // run sim
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceSep(step);
+            sim->advanceFused(step);
             sim->writeOutput(step);
 
             // calc error in rho and vel
