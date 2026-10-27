@@ -97,6 +97,10 @@ template <typename LatticeTag>
 void computeMacroscopic(const amrex::MultiFab& f_mf,
                         amrex::MultiFab&       rho_mf,
                         amrex::MultiFab&       vel_mf);
+// Correct initial velocity when a force is present
+void initVelCorrection(const amrex::MultiFab& rho_mf, 
+                       amrex::MultiFab& vel_mf, 
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
 
 } // namespace muphfasa
 

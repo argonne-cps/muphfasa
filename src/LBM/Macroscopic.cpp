@@ -86,6 +86,24 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
     // sync for profiling
     amrex::Gpu::streamSynchronize();
 }
+void initVelCorrection(const amrex::MultiFab& rho_mf, amrex::MultiFab& vel_mf, 
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F) {
+
+    BL_PROFILE("initVelCorrection");
+
+    for (amrex::MFIter mfi(vel_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box& bx = mfi.tilebox();
+        auto const& rho_arr = rho_mf.const_array(mfi);
+        auto const& vel_arr = vel_mf.array(mfi);
+        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                vel_arr(i, j, k, d) -= amrex::Real(0.5) * F[d] / rho_arr(i, j, k);
+            }
+        });
+    }
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
+}
 
 // ── Explicit instantiations ───────────────────────────────────────────────
 // Dimension-matched only: computeVelocityCell branches on AMREX_SPACEDIM.

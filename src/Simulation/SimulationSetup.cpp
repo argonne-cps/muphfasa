@@ -199,7 +199,21 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
     initData(m_rho, m_vel, *m_units);
-    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
+
+    if (!m_has_forcing) {
+        computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
+    }
+    else {
+        // Guo initialisation: the reported velocity is u = (sum c f + F/2)/rho, so
+        // to start at the requested u0 build f from feq(rho, u0 - F/(2 rho)), then
+        // recompute the macroscopic fields to restore m_vel = u0.
+        initVelCorrection(m_rho, m_vel, m_force_lat);
+
+        computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_f);
+        computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel, m_force_lat);
+
+    }
+
 }
 
 template <typename LatticeTag, typename CollisionModel>
