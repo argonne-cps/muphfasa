@@ -1,0 +1,108 @@
+name: Poiseuille regression
+
+# Builds the 2-D body-force regression tests: uniform_force (exact momentum
+# ramp, fully periodic) and poiseuille (Guo forcing vs. the analytic parabolic
+# profile, with periodic and Inflow/PressureOutlet streamwise boundaries, plus a
+# grid-convergence study via convergence.py).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/regression/poiseuille/**'
+      - 'tests/regression/uniform_force/**'
+      - 'external/amrex'
+      - '.github/workflows/poiseuille-regression.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/regression/poiseuille/**'
+      - 'tests/regression/uniform_force/**'
+      - 'external/amrex'
+      - '.github/workflows/poiseuille-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  poiseuille:
+    name: Convergence check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository (with AMReX submodule)
+        uses: actions/checkout@main
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@main
+        with:
+          python-version: '3.x'
+
+      - name: Install Python dependencies
+        run: pip install numpy matplotlib
+
+      - name: Install ccache
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
+
+      - name: Resolve AMReX submodule commit (cache key)
+        id: amrex
+        run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # AMReX itself rarely changes; caching its compiled objects via ccache
+      # is what keeps this job fast after the first run on a given submodule
+      # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
+      - name: Cache ccache
+        uses: actions/cache@main
+        with:
+          path: ~/.ccache
+          key: poiseuille-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
+          restore-keys: |
+            poiseuille-ccache-${{ runner.os }}-amrex-
+
+      - name: Configure ccache
+        run: |
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+
+      - name: Build and run uniform_force (2-D)
+        working-directory: tests/regression/uniform_force
+        # Exits non-zero unless u_k = k F / rho holds to round-off every step.
+        run: |
+          make -j"$(nproc)"
+          ./test_uniform_force2d.gnu.ex inputs
+
+      - name: Build and run poiseuille (2-D)
+        working-directory: tests/regression/poiseuille
+        # Exits non-zero if the steady profile differs from the analytic
+        # parabola by more than test.max_rel_err (set in inputs).
+        run: |
+          make -j"$(nproc)"
+          ./test_poiseuille2d.gnu.ex inputs
+
+      - name: Run poiseuille with Inflow / PressureOutlet (2-D)
+        working-directory: tests/regression/poiseuille
+        # Forced Poiseuille through a velocity inlet and fixed-density outlet;
+        # checks the developed profile in test.window against the parabola.
+        run: ./test_poiseuille2d.gnu.ex inputs_inflow
+
+      - name: Grid-convergence study
+        working-directory: tests/regression/poiseuille
+        # Observed order is 2.00 locally (second-order LBM with halfway
+        # bounce-back); --min-order leaves margin for platform noise while
+        # still catching a real regression in the forcing term.
+        run: python3 convergence.py --n-list 16 32 64 --min-order 1.8
+
+      - name: Upload plots and data
+        if: always()
+        uses: actions/upload-artifact@main
+        with:
+          name: poiseuille-regression-results
+          path: |
+            tests/regression/poiseuille/poiseuille2d_convergence.png
+            tests/regression/poiseuille/poiseuille2d_convergence.csv
+          if-no-files-found: ignore

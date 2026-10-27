@@ -12,6 +12,7 @@
 #define MUPHFASA_MOVINGWALL_KERNEL_H
 
 #include <AMReX_Array4.H>
+#include <AMReX_Box.H>
 #include <AMReX_GpuQualifiers.H>
 #include <AMReX_IntVect.H>
 #include <AMReX_REAL.H>
@@ -23,20 +24,18 @@ namespace muphfasa {
 template <typename LatticeTag>
 struct MovingWallKernel
 {
-    // dir: wall normal (0=x, 1=y, 2=z). bound: -1 for the lo face, +1 for
-    // the hi face. iv is the ghost cell being filled.
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static void apply(const amrex::IntVect& iv,
                        amrex::Array4<amrex::Real> const& f,
-                       int dir, int bound,
+                       const amrex::Box& domain,
                        amrex::Real rho_wall,
                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall
                        ) noexcept
     {
-        BounceBack<LatticeTag>::apply(iv, f, dir, bound, rho_wall, Uwall);
+        BounceBack<LatticeTag>::apply(iv, f, domain, rho_wall, Uwall);
     }
 };
 
-}
+} // namespace muphfasa
 
 #endif //MUPHFASA_MOVINGWALL_KERNEL_H

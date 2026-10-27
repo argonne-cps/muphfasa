@@ -8,3 +8,5 @@ tests/regression/*/*.png
 tests/regression/*/Backtrace.*
 tests/regression/*/convergence_runs/
 tests/regression/*/profile_run/
+__pycache__
+*.ex

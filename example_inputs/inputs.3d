@@ -3,7 +3,6 @@
 # ── Grid ──────────────────────────────────────────────────────────────────
 grid.ncells        = 64 32 32
 grid.max_grid_size = 32
-grid.n_ghost       = 1
 
 # ── Simulation ─────────────────────────────────────────────────────────────
 sim.max_step       = 5000
@@ -18,19 +17,28 @@ units.Re            = 100.0
 units.Ma            = 0.05
 units.ref_length    = 1.0
 units.ref_velocity  = 1.0
-units.ref_viscosity = 0.01
 units.ref_density   = 1.0
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 geometry.prob_lo    = 0.0  0.0  0.0
 geometry.prob_hi    = 2.0  1.0  1.0
-geometry.is_periodic = 1   0    1    # periodic in x and z, walls in y
 geometry.type       = box
 geometry.use_eb     = 0
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 bc.lo_type = Periodic  NoSlip  Periodic
 bc.hi_type = Periodic  NoSlip  Periodic
+# Face types: NoSlip | MovingWall | Inflow | Outflow | PressureOutlet | Periodic.
+# Inflow takes bc.<face>_Uin; PressureOutlet (fixed-density outlet) takes an
+# optional bc.<face>_rho [kg/m^3] (default units.ref_density), e.g.
+#   bc.lo_type = Inflow NoSlip      bc.lox_Uin = 0.4 0.0
+#   bc.hi_type = PressureOutlet NoSlip   bc.hix_rho = 1.0
+
+# ── Body force (optional) ──────────────────────────────────────────────────
+# Uniform acceleration [m/s^2], one value per dimension (Guo forcing). Omit
+# (or set to all zeros) for no forcing; force-free runs pay no extra cost.
+# E.g. Poiseuille flow: periodic in x/y, NoSlip walls in z, force along x.
+# forcing.accel     = 0.125 0.0 0.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 500

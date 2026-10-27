@@ -264,6 +264,33 @@ amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM
     return readPerFaceVelocity(pp, param_Uin, false, true);
 }
 
+std::array<amrex::Real, 2 * AMREX_SPACEDIM> InputParser::faceDensity() const {
+    amrex::ParmParse pp("bc");
+    static const char* keys[6] = {"lox_rho", "hix_rho", "loy_rho", "hiy_rho", "loz_rho", "hiz_rho"};
+    std::array<amrex::Real, 2 * AMREX_SPACEDIM> rho{};
+    for (int i = 0; i < 2 * AMREX_SPACEDIM; ++i) {
+        rho[i] = refDensity();
+        pp.query(keys[i], rho[i]);
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(rho[i] > 0., "InputParser: bc.<face>_rho must be positive");
+    }
+    return rho;
+}
+
+amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> InputParser::forcingAccel() const
+{
+    amrex::ParmParse pp("forcing");
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> accel{};
+    std::vector<amrex::Real> vals{};
+    pp.queryarr("accel", vals);
+    if (vals.empty()) { return accel; } // no forcing
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        static_cast<int>(vals.size()) == AMREX_SPACEDIM,
+        "InputParser: forcing.accel must list exactly AMREX_SPACEDIM components");
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { accel[d] = vals[d]; }
+    return accel;
+}
+
 int InputParser::plotInterval() const
 {
     amrex::ParmParse pp("amr");

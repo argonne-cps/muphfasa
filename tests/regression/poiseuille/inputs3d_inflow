@@ -1,0 +1,40 @@
+# 3-D version of inputs_inflow: body-force-driven plane Poiseuille flow with
+# Inflow at x=lo and PressureOutlet at x=hi, periodic in y, NoSlip walls at
+# z=0 and z=H, force along x. Same lattice-unit setup as inputs_inflow
+# (N_max = 96, H = 16, tau = 0.8, F_lat = 6.25e-5, U_mean_phys = 0.4); see that
+# file and test_poiseuille.cpp for the 3H/(3H-1) inlet corner correction
+# (valid for D3Q19/D3Q27 face diagonals).
+
+grid.ncells      = 96 4 16     # Nx Ny Nz
+grid.max_grid_size = 96
+grid.n_ghost     = 1
+
+sim.max_step     = 12000
+sim.stop_time    = -1.0
+
+lbm.lattice_type = D3Q19
+lbm.tau          = 0.8
+
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.Re            = 32.0
+units.ref_density   = 1.0
+
+forcing.accel = 5.4  0.0  0.0
+
+bc.lo_type = Inflow   Periodic  NoSlip
+bc.hi_type = PressureOutlet Periodic  NoSlip
+bc.lox_Uin = 0.408510638297872  0.0  0.0   # 0.4 * 3H/(3H-1), H=16
+
+geometry.prob_lo    = 0.0  0.0  0.0
+geometry.prob_hi    = 1.0  0.0416666666666667  0.1666666666666667
+
+amr.plot_int        = 4000
+amr.chk_int         = 12001
+amr.plot_file       = plt
+amr.check_file      = chk
+
+test.window         = 0.5 0.8
+test.max_rel_err    = 5e-3     # observed 1.9e-3
+test.max_transverse = 4e-5     # observed 1.4e-5
+test.max_rho_spread = 2e-5     # observed 6e-6

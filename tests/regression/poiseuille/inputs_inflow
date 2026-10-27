@@ -1,0 +1,48 @@
+# Regression test: body-force-driven plane Poiseuille flow with Inflow at x=lo
+# and PressureOutlet at x=hi (2-D), NoSlip walls at y=0 and y=H, force along x.
+#
+# The inlet is uniform, so the profile develops downstream; bc.lox_Uin is set
+# so the mass flux that actually enters matches the analytic mean velocity
+# (2/3) U_max of the body-force-driven parabola (see test_poiseuille.cpp for
+# the 3H/(3H-1) corner correction), and only the window
+# test.window (fractions of the length) is compared against it.
+#
+# Units chosen by hand (test_poiseuille.cpp asserts the Uin consistency):
+#   N_max = 96 (x), H = 16 cells, L_ref = U_ref = 1, tau = 0.8 (nu_lat = 0.1)
+#   -> u_lat = 1/30, dx = 1/96, dt = 1/2880 s
+#   F_lat = 8 nu U_max/H^2 = 6.25e-5 for U_max_lat = 0.02
+#   -> forcing.accel = F_lat dx/dt^2 = 5.4,  U_mean_phys = (2/3) 0.02 * 30 = 0.4
+
+grid.ncells      = 96 16     # Nx Ny (Inflow/Outflow along x, walls at y=0 and y=H)
+grid.max_grid_size = 96
+grid.n_ghost     = 1
+
+sim.max_step     = 12000
+sim.stop_time    = -1.0
+
+lbm.lattice_type = D2Q9
+lbm.tau          = 0.8
+
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.Re            = 32.0
+units.ref_density   = 1.0
+
+forcing.accel = 5.4  0.0
+
+bc.lo_type = Inflow   NoSlip
+bc.hi_type = PressureOutlet NoSlip
+bc.lox_Uin = 0.408510638297872  0.0   # (vx, vy) physical = 0.4 * 3H/(3H-1), H=16 (inlet corner loss)
+
+geometry.prob_lo    = 0.0  0.0
+geometry.prob_hi    = 1.0  0.1666666666666667
+
+amr.plot_int        = 4000
+amr.chk_int         = 12001
+amr.plot_file       = plt
+amr.check_file      = chk
+
+test.window         = 0.5 0.8
+test.max_rel_err    = 5e-3     # observed 1.9e-3
+test.max_transverse = 4e-5     # observed 1.4e-5
+test.max_rho_spread = 2e-5     # observed 6e-6

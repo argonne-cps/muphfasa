@@ -47,6 +47,27 @@ void computeVelocityCell(amrex::GpuArray<const amrex::Real, LatticeTag::Q> const
 #endif
 }
 
+// Forcing variant: same, with the half-force velocity correction.
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+void computeVelocityCell(amrex::Array4<const amrex::Real> const& f_arr,
+                         const amrex::Real rho,
+                         amrex::Array4<amrex::Real> const& vel_arr,
+                         int i, int j, int k,
+                         amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F) noexcept
+{
+#if (AMREX_SPACEDIM == 2)
+    const auto u = computeVelocityCell2D<LatticeTag>(f_arr, rho, i, j, k, F);
+    vel_arr(i, j, k, 0) = u[0];
+    vel_arr(i, j, k, 1) = u[1];
+#else
+    const auto u = computeVelocityCell3D<LatticeTag>(f_arr, rho, i, j, k, F);
+    vel_arr(i, j, k, 0) = u[0];
+    vel_arr(i, j, k, 1) = u[1];
+    vel_arr(i, j, k, 2) = u[2];
+#endif
+}
+
 // ── computeDensity ────────────────────────────────────────────────────────
 template <typename LatticeTag>
 void computeDensity(const amrex::Box& box,
@@ -76,6 +97,19 @@ void computeVelocity(const amrex::Box& box,
     });
 }
 
+template <typename LatticeTag>
+void computeVelocity(const amrex::Box& box,
+                     amrex::Array4<const amrex::Real> const& f_arr,
+                     amrex::Array4<const amrex::Real> const& rho_arr,
+                     amrex::Array4<amrex::Real> const& vel_arr,
+                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    BL_PROFILE("computeVelocity(forced)");
+
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+        computeVelocityCell<LatticeTag>(f_arr, rho_arr(i, j, k), vel_arr, i, j, k, F);
+    });
+}
 
 // ── computeMacroscopic (MultiFab) ─────────────────────────────────────────
 template <typename LatticeTag>
@@ -102,6 +136,50 @@ void computeMacroscopic(const amrex::MultiFab& f_mf,
     amrex::Gpu::streamSynchronize();
 }
 
+template <typename LatticeTag>
+void computeMacroscopic(const amrex::MultiFab& f_mf,
+                        amrex::MultiFab&       rho_mf,
+                        amrex::MultiFab&       vel_mf,
+                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    BL_PROFILE("computeMacroscopic(forced)");
+
+    #ifdef _OPENMP
+    #pragma omp parallel
+    #endif
+    for (amrex::MFIter mfi(f_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const auto tileBox = mfi.tilebox();
+
+        amrex::Array4<amrex::Real const> const& f_arr = f_mf[mfi].const_array();
+        amrex::Array4<amrex::Real> const& rho = rho_mf[mfi].array();
+        amrex::Array4<amrex::Real> const& vel = vel_mf[mfi].array();
+        computeDensity<LatticeTag>(tileBox, f_arr, rho);
+        computeVelocity<LatticeTag>(tileBox, f_arr, rho, vel, F);
+    }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
+}
+
+void initVelCorrection(const amrex::MultiFab& rho_mf, amrex::MultiFab& vel_mf, 
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F) {
+
+    BL_PROFILE("initVelCorrection");
+
+    for (amrex::MFIter mfi(vel_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box& bx = mfi.tilebox();
+        auto const& rho_arr = rho_mf.const_array(mfi);
+        auto const& vel_arr = vel_mf.array(mfi);
+        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+            for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+                vel_arr(i, j, k, d) -= amrex::Real(0.5) * F[d] / rho_arr(i, j, k);
+            }
+        });
+    }
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
+}
+
 // ── Explicit instantiations ───────────────────────────────────────────────
 // Dimension-matched only: computeVelocityCell branches on AMREX_SPACEDIM.
 #if (AMREX_SPACEDIM == 2)
@@ -119,18 +197,26 @@ template void computeDensity<D3Q27>(const amrex::Box&, amrex::Array4<const amrex
 
 #if (AMREX_SPACEDIM == 2)
 template void computeVelocity<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void computeVelocity<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #else
 template void computeVelocity<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeVelocity<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 template void computeVelocity<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void computeVelocity<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void computeVelocity<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void computeVelocity<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #endif
 
 #if (AMREX_SPACEDIM == 2)
 template void computeMacroscopic<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #else
 template void computeMacroscopic<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
 template void computeMacroscopic<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
 template void computeMacroscopic<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&);
+template void computeMacroscopic<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void computeMacroscopic<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void computeMacroscopic<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, amrex::MultiFab&, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #endif
 
 } // namespace muphfasa

@@ -1,12 +1,16 @@
 // BoundaryConditions.H — BCManager<LatticeTag>: the GPU-callable functor
 // plugged into amrex::PhysBCFunct<amrex::GpuBndryFuncFab<...>> that fills
-// ghost cells for the LBM distribution MultiFab. See BC_implementation_plan.md
-// (Option 2.1) for the full design rationale.
+// ghost cells for the LBM distribution MultiFab.
 //
-// Contract: this functor is only ever invoked by AMReX for ghost cells (`iv`
-// outside the valid box). Its job is to fill that ghost cell with whatever
-// value makes the next stream() produce the right boundary physics at the
-// adjacent fluid node — it never corrects a valid interior cell directly.
+// Ghost population rule: for ghost g, population n is needed iff g + c_n is
+// inside geom.Domain(); source cell is g + c_n; BounceBack: f(g,n)=f(src,opp)+contrib,
+// Outflow: f(g,n)=f(src,n), PressureOutlet: anti-bounce-back at fixed density.
+// This covers faces, edges, and corners uniformly
+//
+// Priority resolution at edges/corners: NoSlip(3) > MovingWall(2) > Inflow(1) >
+// Outflow = PressureOutlet(0). Winner type among touching faces determines BC;
+// rho/U are averaged over faces of the winning type only. Inflow, Outflow and
+// PressureOutlet meeting at one edge/corner (any two of them) aborts.
 
 #ifndef MUPHFASA_BOUNDARY_CONDITIONS_H
 #define MUPHFASA_BOUNDARY_CONDITIONS_H
@@ -15,6 +19,7 @@
 #include "BCTypes/NoSlipKernel.H"
 #include "BCTypes/InflowKernel.H"
 #include "BCTypes/OutflowKernel.H"
+#include "BCTypes/PressureOutletKernel.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_BCRec.H>
@@ -28,21 +33,13 @@
 
 namespace muphfasa {
 
-// Shared face-index convention: [xlo, xhi, ylo, yhi, zlo, zhi]. Used by
-// both BCManager::setFaceBC/operator() and the registry/SimulationSetup
+// Shared face-index convention: [xlo, xhi, ylo, yhi, zlo, zhi].
 inline constexpr int faceIndex(int dir, int bound) noexcept {
     return 2 * dir + (bound < 0 ? 0 : 1);
 }
 
-// Our own dispatch tag — never amrex::BCType. Adding a BC means adding an
-// enumerator here, nowhere else in amrex's namespace.
-enum class lbmBCtype { MovingWall, NoSlip, Inflow, Outflow };
+enum class lbmBCtype { MovingWall, NoSlip, Inflow, Outflow, PressureOutlet, Periodic };
 
-// The only amrex::BCType code our custom BCs ever use. Chosen from the
-// `user_*` range AMReX reserves for exactly this purpose; never ext_dir/
-// foextrap/hoextrap/hoextrapcc/reflect_even/reflect_odd — those drive
-// AMReX's own generic fill/interpolation machinery, which we don't want
-// touching this field.
 inline constexpr int kCustomBCSentinel = amrex::BCType::user_1;
 static_assert(kCustomBCSentinel != amrex::BCType::int_dir &&
               kCustomBCSentinel != amrex::BCType::ext_dir &&
@@ -53,13 +50,70 @@ static_assert(kCustomBCSentinel != amrex::BCType::int_dir &&
               kCustomBCSentinel != amrex::BCType::reflect_odd,
               "custom BC sentinel must not collide with a semantically-defined amrex::BCType");
 
+// ── helpers for 3^D resolved BC indexing ────────────────────────────────
+namespace detail {
+inline constexpr int numCodes() noexcept {
+#if (AMREX_SPACEDIM == 2)
+    return 9;
+#else
+    return 27;
+#endif
+}
+
+// get index of m_resolved_bc for ghost cell
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+int ghostClass(const amrex::IntVect& code) noexcept {
+    int idx = 0;
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        idx += (code[d] + 1) * std::pow(3, d);
+    }
+    return idx;
+}
+} // namespace detail
+
+// ── Priority resolution ────────────────────────────────────────────────
+inline int bcRank(lbmBCtype t) noexcept {
+    switch (t) {
+        case lbmBCtype::NoSlip:     return 3;
+        case lbmBCtype::MovingWall: return 2;
+        case lbmBCtype::Inflow:     return 1;
+        case lbmBCtype::Outflow:    return 0;
+        case lbmBCtype::PressureOutlet: return 0;
+        case lbmBCtype::Periodic:   return -1;
+    }
+    return -1;
+}
+
+// Result of resolving touching faces at an edge/corner ghost.
+struct ResolvedFaceBC {
+    lbmBCtype type{};
+    amrex::Real rho{1.0};
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> U{AMREX_D_DECL(0.,0.,0.)};
+};
+
+// Resolve touching faces to a single BC. Host-side, unit-testable.
+// face_types/rho/U are parallel arrays of length nfaces (faces that meet at ghost).
+// Aborts if two of Inflow/Outflow/PressureOutlet are present.
+ResolvedFaceBC resolveBC(
+    const amrex::Vector<lbmBCtype>& face_types,
+    const amrex::Vector<amrex::Real>& face_rho,
+    const amrex::Vector<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>>& face_U,
+    const amrex::Vector<std::string>& face_names = {});
+
+bool hasConflictingBC(const amrex::Vector<lbmBCtype>& face_types) noexcept;
+
 template <typename LatticeTag>
 class BCManager
 {
 public:
-    // numcomp/dcomp are not looped here: one BCRec (at bcomp) represents the
-    // whole LatticeTag::Q-component field, since a wall applies to all
-    // populations together, not per-component.
+    struct ResolvedBC {
+        lbmBCtype type{lbmBCtype::Periodic};
+        amrex::Real rho{1.0};
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> U{AMREX_D_DECL(0.,0.,0.)};
+    };
+
+    BCManager() { m_face_bc.fill(lbmBCtype::Periodic); }
+
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     void operator()(const amrex::IntVect& iv,
                      amrex::Array4<amrex::Real> const& dest,
@@ -71,90 +125,84 @@ public:
                      const int bcomp,
                      const int orig_comp) const
     {
-        amrex::ignore_unused(dcomp, numcomp, time, orig_comp);
+        amrex::ignore_unused(dcomp, numcomp, time, bcr, bcomp, orig_comp);
 
         const amrex::Box& domain = geom.Domain();
+
+        // Compute code[d] in {-1,0,+1} per dimension
+        amrex::IntVect code{AMREX_D_DECL(0,0,0)};
         const auto dom_lo = domain.smallEnd();
         const auto dom_hi = domain.bigEnd();
-
-        // loop over directions
-        for (int dir = 0; dir < AMREX_SPACEDIM; ++dir) {
-            int bound = 0;
-            int amrex_code = amrex::BCType::int_dir;
-
-            if (iv[dir] < dom_lo[dir]) {
-                bound = -1;
-                amrex_code = bcr[bcomp].lo(dir);
-            } else if (iv[dir] > dom_hi[dir]) {
-                bound = 1;
-                amrex_code = bcr[bcomp].hi(dir);
-            } else {
-                continue; // not a ghost cell in this direction
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+            if (iv[d] < dom_lo[d]) code[d] = -1;
+            else if (iv[d] > dom_hi[d]) code[d] = 1;
+            else code[d] = 0;
+            // Periodic dims are not walls: FillBoundary already filled them.
+            // Use the geometry, not bcr: PhysBCFunct hands us a per-box BCRec
+            // where sides interior to the domain are int_dir.
+            if (geom.isPeriodic(d)) {
+                code[d] = 0;
             }
+        }
 
-            if (amrex_code == amrex::BCType::int_dir) {
-                continue; // periodic — FillBoundary already handled it
-            }
+        // All zero => periodic-only ghost, already filled by FillBoundary
+        bool all_zero = true;
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) if (code[d] != 0) all_zero = false;
+        if (all_zero) return;
 
-            // amrex_code is just our sentinel here; the real kind comes
-            // from our own table.
-            switch (m_face_bc[faceIndex(dir, bound)]) {
-                case lbmBCtype::MovingWall:
-                    MovingWallKernel<LatticeTag>::apply(iv, dest, dir, bound,
-                                                        m_face_rho_wall[faceIndex(dir, bound)],
-                                                        m_face_vel[faceIndex(dir, bound)]);
-                    break;
+        int idx = detail::ghostClass(code);
+        const ResolvedBC& rbc = m_resolved[idx];
 
-                case lbmBCtype::NoSlip:
-                    NoSlipKernel<LatticeTag>::apply(iv, dest, dir, bound);
-                    break;
+        // Periodic entries are never used (FillBoundary handled them) but
+        // may appear in the resolved table for debugging — just return.
+        if (rbc.type == lbmBCtype::Periodic) return;
 
-                case lbmBCtype::Inflow:
-                    InflowKernel<LatticeTag>::apply(iv, dest, dir, bound,
-                                                    m_face_rho_wall[faceIndex(dir, bound)],
-                                                    m_face_vel[faceIndex(dir, bound)]);
-                    break;
-
-                case lbmBCtype::Outflow:
-                    OutflowKernel<LatticeTag>::apply(iv, dest, dir, bound);
-                    break;
-
-                default:
-                    amrex::Abort("BCManager: unrecognized lbmBCtype encountered while filling boundary ghost cells");
-                    break;
-            }
+        switch (rbc.type) {
+            case lbmBCtype::MovingWall:
+                MovingWallKernel<LatticeTag>::apply(iv, dest, domain, rbc.rho, rbc.U);
+                break;
+            case lbmBCtype::NoSlip:
+                NoSlipKernel<LatticeTag>::apply(iv, dest, domain);
+                break;
+            case lbmBCtype::Inflow:
+                InflowKernel<LatticeTag>::apply(iv, dest, domain, rbc.rho, rbc.U);
+                break;
+            case lbmBCtype::Outflow:
+                OutflowKernel<LatticeTag>::apply(iv, dest, domain);
+                break;
+            case lbmBCtype::PressureOutlet:
+                PressureOutletKernel<LatticeTag>::apply(iv, dest, domain, rbc.rho);
+                break;
+            case lbmBCtype::Periodic:
+                return;
+            default:
+                amrex::Abort("BCManager: unrecognized lbmBCtype");
+                break;
         }
     }
 
-    // Topology: which face has which BC kind. Set once at setup
     void setFaceBC(int dir, int bound, lbmBCtype kind) {
         m_face_bc[faceIndex(dir, bound)] = kind;
     }
-
-    // rho/Uwall below are also used as rho_in/Uin for Inflow faces.
     void setFaceDensity(int dir, int bound, amrex::Real rho) {
         m_face_rho_wall[faceIndex(dir, bound)] = rho;
     }
-
     void setFaceVel(int dir, int bound, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> Uwall) {
         m_face_vel[faceIndex(dir, bound)] = Uwall;
     }
 
+    // Must be called after all setFace* and before use on device
+    void finalize();
+
 private:
     amrex::GpuArray<lbmBCtype, 2 * AMREX_SPACEDIM> m_face_bc{};
-    // wall density (MovingWall) or inflow density (Inflow)
     amrex::GpuArray<amrex::Real, 2 * AMREX_SPACEDIM> m_face_rho_wall{};
-    // wall velocity (MovingWall) or inflow velocity (Inflow)
     amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> m_face_vel{};
+    amrex::GpuArray<ResolvedBC, detail::numCodes()> m_resolved{};
 };
 
-// Face name -> our own dispatch enum. 
 lbmBCtype parselbmBCtype(const std::string& name);
 
-// Face names -> the amrex::BCRec actually handed to PhysBCFunct. Every
-// entry in the returned vector is identical and only ever carries 
-//int_dir ("Periodic") or kCustomBCSentinel (everything else) 
-// `ncomp` should be LatticeTag::Q;
 amrex::Vector<amrex::BCRec> makeBCRecVector(
     const std::array<std::string, 2 * AMREX_SPACEDIM>& names, int ncomp);
 

@@ -54,6 +54,13 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // Set collision param: omega = 1/tau.
     m_omega = amrex::Real(1.0) / m_units->relaxationTime();
 
+    // Body force: physical acceleration -> lattice units, cached once.
+    const auto accel_phys = params.forcingAccel();
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        m_force_lat[d] = m_units->toLatticeAcceleration(accel_phys[d]);
+        if (accel_phys[d] != amrex::Real(0.0)) { m_has_forcing = true; }
+    }
+
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
     if (params.useEB()) {
@@ -115,7 +122,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceSep(int step)
     // collide
     amrex::Real t0 = amrex::second();
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
-    collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_omega);
+    if (m_has_forcing) {
+        collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_vel, m_omega, m_force_lat);
+    } else {
+        collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_omega);
+    }
     amrex::Real t1 = amrex::second();
     m_t_collide += t1 - t0;
 
@@ -129,7 +140,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceSep(int step)
     m_t_stream += t3 - t2;
 
     // compute macro
-    computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel);
+    if (m_has_forcing) {
+        computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel, m_force_lat);
+    } else {
+        computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel);
+    }
     amrex::Real t4 = amrex::second();
     m_t_macro += t4 - t3;
 
@@ -208,7 +223,21 @@ template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::setInitialConditions()
 {
     initData(m_rho, m_vel, *m_units);
-    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_fin);
+
+    if (!m_has_forcing) {
+        computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_fin);
+    }
+    else {
+        // Guo initialisation: the reported velocity is u = (sum c f + F/2)/rho, so
+        // to start at the requested u0 build f from feq(rho, u0 - F/(2 rho)), then
+        // recompute the macroscopic fields to restore m_vel = u0.
+        initVelCorrection(m_rho, m_vel, m_force_lat);
+
+        computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_fin);
+        computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel, m_force_lat);
+
+    }
+
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -235,6 +264,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
     const auto rhoWall = m_units->toLatticeDensity(m_params.refDensity());
     auto Uwall = m_params.Uwall();
     auto Uin = m_params.Uinflow();
+    const auto faceRho = m_params.faceDensity();
     for (int wall_idx=0; wall_idx < 2 * AMREX_SPACEDIM; ++wall_idx) {
         for (int dim=0; dim < AMREX_SPACEDIM; ++dim) {
             Uwall[wall_idx][dim] = m_units->toLatticeVelocity(Uwall[wall_idx][dim]);
@@ -259,6 +289,10 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                     bc_manager.setFaceVel(dir, bound, Uwall[2*dir]);
                 else if (bound == 1)
                     bc_manager.setFaceVel(dir, bound, Uwall[2*dir+1]);
+            } else if (name == "NoSlip") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
             } else if (name == "Inflow") {
                 // reuses the reference density as rho_in; see InputParser::Uinflow()
                 bc_manager.setFaceDensity(dir, bound, rhoWall);
@@ -266,9 +300,19 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir]);
                 else if (bound == 1)
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir+1]);
+            } else if (name == "PressureOutlet") {
+                bc_manager.setFaceDensity(dir, bound,
+                    m_units->toLatticeDensity(faceRho[faceIndex(dir, bound)]));
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
+            } else if (name == "Outflow") {
+                bc_manager.setFaceDensity(dir, bound, rhoWall);
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
             }
         }
     }
+    bc_manager.finalize();
 
     amrex::Vector<amrex::BCRec> bcs = makeBCRecVector(names, LatticeTag::Q);
 

@@ -4,7 +4,6 @@
 # ── Grid ──────────────────────────────────────────────────────────────────
 grid.ncells        = 128 64     # cells in x and y
 grid.max_grid_size = 32          # max tile size for load balancing
-grid.n_ghost       = 1           # ghost layers (1 is sufficient for BGK)
 
 # ── Simulation ─────────────────────────────────────────────────────────────
 sim.max_step       = 10000
@@ -19,19 +18,28 @@ units.Re           = 100.0       # Reynolds number
 units.Ma           = 0.05        # Mach number (keep < 0.1 for accuracy)
 units.ref_length   = 1.0         # [m]
 units.ref_velocity = 1.0         # [m/s]
-units.ref_viscosity = 0.01       # [m^2/s]
 units.ref_density  = 1.0         # [kg/m^3]
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 geometry.prob_lo    = 0.0  0.0
 geometry.prob_hi    = 2.0  1.0
-geometry.is_periodic = 1   0     # periodic in x, walls in y
 geometry.type       = box         # "box" | "sphere" | "stl"
 geometry.use_eb     = 0
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 bc.lo_type = Periodic  NoSlip
 bc.hi_type = Periodic  NoSlip
+# Face types: NoSlip | MovingWall | Inflow | Outflow | PressureOutlet | Periodic.
+# Inflow takes bc.<face>_Uin; PressureOutlet (fixed-density outlet) takes an
+# optional bc.<face>_rho [kg/m^3] (default units.ref_density), e.g.
+#   bc.lo_type = Inflow NoSlip      bc.lox_Uin = 0.4 0.0
+#   bc.hi_type = PressureOutlet NoSlip   bc.hix_rho = 1.0
+
+# ── Body force (optional) ──────────────────────────────────────────────────
+# Uniform acceleration [m/s^2], one value per dimension (Guo forcing). Omit
+# (or set to all zeros) for no forcing; force-free runs pay no extra cost.
+# E.g. Poiseuille flow: periodic in x, NoSlip walls in y, force along x.
+# forcing.accel     = 0.125 0.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 500

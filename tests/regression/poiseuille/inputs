@@ -1,42 +1,49 @@
-# Regression test: Plane Poiseuille flow (2-D channel, pressure-driven).
-# Analytic solution: parabolic velocity profile u(y) = (dp/dx)/(2*mu) * y*(H-y).
-# Expected convergence: second-order in dx.
+# Regression test: plane Poiseuille flow (2-D channel driven by a body force).
+# Periodic in x, NoSlip walls at y=lo/hi, uniform body force along x
+# (Guo forcing, see Forcing_plan.md). Steady-state analytic solution
+#   u(y) = F/(2 nu) * y*(H - y),  U_max = F H^2/(8 nu),  U_mean = (2/3) U_max
+# which test_poiseuille.cpp checks the simulated profile against.
+# H (wall-to-wall distance, lattice units) = grid.ncells[1] (halfway bounce-back).
 
 # ── Grid ──────────────────────────────────────────────────────────────────
-grid.ncells      = 4 32     # Nx Ny  (periodic in x, walls at y=0 and y=H)
+grid.ncells      = 4 32     # Nx Ny (periodic in x, walls at y=0 and y=H)
 grid.max_grid_size = 32
 grid.n_ghost     = 1
 
 # ── Simulation ─────────────────────────────────────────────────────────────
-sim.max_step     = 10000
+# H^2/nu_lat = 10240 steps (H=32, nu_lat=0.1 below); 25600 = 2.5 H^2/nu_lat, so
+# the slowest decaying mode (exp(-pi^2 nu t/H^2)) is down to ~1e-11.
+sim.max_step     = 25600
 sim.stop_time    = -1.0      # run to max_step
 
 # ── LBM ────────────────────────────────────────────────────────────────────
 lbm.lattice_type = D2Q9
 
 # ── Physical units ─────────────────────────────────────────────────────────
-# tau (relaxation time) is derived from these via UnitConverter, not set
-# directly -- see SimulationImpl's constructor. With N_ref = max(grid.ncells)
-# = 32 and the default lattice velocity U_lat=0.1, this gives tau=0.8.
+# N_ref = 32, default lattice velocity 0.1 -> dx = 1/32, dt = 0.1/32,
+# nu_lat = 0.1, tau = 0.8.
 units.ref_length    = 1.0
 units.ref_velocity  = 1.0
-units.ref_viscosity = 0.03125  # = 1/32; gives tau=0.8 at N_ref=32
-units.Re            = 32.0     # = ref_velocity*ref_length/ref_viscosity
-units.Ma            = 0.05
+units.Re            = 32.0   # implies nu = 1/32
+
+# ── Body force ─────────────────────────────────────────────────────────────
+# Physical acceleration [m/s^2]: F_lat = 3.9e-5, U_max = a H^2/(8 nu) = 0.5 m/s
+# (0.05 in lattice units, Mach ~0.087).
+forcing.accel = 0.125  0.0
 
 # ── Boundary conditions ────────────────────────────────────────────────────
-# x: periodic  (set automatically when ncells[0] > 1 and geom is periodic)
-# y: no-slip walls (bounce-back)
 bc.lo_type = Periodic  NoSlip
 bc.hi_type = Periodic  NoSlip
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 geometry.prob_lo    = 0.0  0.0
 geometry.prob_hi    = 0.125  1.0
-geometry.is_periodic = 1   0
 
 # ── Output ─────────────────────────────────────────────────────────────────
-amr.plot_int        = 1000
-amr.chk_int         = 5000
+amr.plot_int        = 5120
+amr.chk_int         = 25601
 amr.plot_file       = plt
 amr.check_file      = chk
+
+# Observed final profile error is ~5e-4 of U_max; tolerance is ~3x that.
+test.max_rel_err = 1.5e-3

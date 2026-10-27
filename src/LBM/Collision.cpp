@@ -38,6 +38,27 @@ void BGK::collideArr(const amrex::Box& box,
     });
 }
 
+template <typename LatticeTag>
+void BGK::collideArr(const amrex::Box& box,
+                     amrex::Array4<amrex::Real> const& f_arr,
+                     amrex::Array4<const amrex::Real> const& feq_arr,
+                     amrex::Array4<const amrex::Real> const& vel_arr,
+                     const amrex::Real omega,
+                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    BL_PROFILE("BGK::collideArr(forced)");
+
+    // F is captured by value (GpuArray is device-copyable).
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> u{};
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) { u[d] = vel_arr(i, j, k, d); }
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+            f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega)
+                              + guoForceTerm<LatticeTag>(n, u, F, omega);
+        }
+    });
+}
+
 // ── MultiFab-level dispatch ───────────────────────────────────────────────
 template <typename LatticeTag, typename CollisionModel>
 void collideMF(amrex::MultiFab&       f_mf,
@@ -55,6 +76,31 @@ void collideMF(amrex::MultiFab&       f_mf,
         amrex::Array4<amrex::Real> const& f_arr = f_mf[mfi].array();
         amrex::Array4<amrex::Real const> const& feq_arr = feq_mf[mfi].const_array();
         CollisionModel::template collideArr<LatticeTag>(tileBox, f_arr, feq_arr, omega);
+    }
+
+    // sync for profiling
+    amrex::Gpu::streamSynchronize();
+}
+
+template <typename LatticeTag, typename CollisionModel>
+void collideMF(amrex::MultiFab&       f_mf,
+               const amrex::MultiFab& feq_mf,
+               const amrex::MultiFab& vel_mf,
+               amrex::Real            omega,
+               amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    BL_PROFILE("collideMF(forced)");
+
+    #ifdef _OPENMP
+    #pragma omp parallel
+    #endif
+    for (amrex::MFIter mfi(f_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const auto tileBox = mfi.tilebox();
+
+        amrex::Array4<amrex::Real> const& f_arr = f_mf[mfi].array();
+        amrex::Array4<amrex::Real const> const& feq_arr = feq_mf[mfi].const_array();
+        amrex::Array4<amrex::Real const> const& vel_arr = vel_mf[mfi].const_array();
+        CollisionModel::template collideArr<LatticeTag>(tileBox, f_arr, feq_arr, vel_arr, omega, F);
     }
 
     // sync for profiling
@@ -196,6 +242,19 @@ template void collideMF<D2Q9, BGK> (amrex::MultiFab&, const amrex::MultiFab&, am
 template void collideMF<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideMF<D3Q19,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideMF<D3Q27,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
+
+// Forced variants: need cz() on 3D lattices only, so dimension-matched.
+#if (AMREX_SPACEDIM == 2)
+template void BGK::collideArr<D2Q9>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void collideMF<D2Q9, BGK>(amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+#else
+template void BGK::collideArr<D3Q15>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void BGK::collideArr<D3Q19>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void BGK::collideArr<D3Q27>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Array4<const amrex::Real> const&, const amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void collideMF<D3Q15, BGK>(amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void collideMF<D3Q19, BGK>(amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void collideMF<D3Q27, BGK>(amrex::MultiFab&, const amrex::MultiFab&, const amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+#endif
 
 // Dimension-matched only: collideFullArr/MF branch on AMREX_SPACEDIM.
 #if (AMREX_SPACEDIM == 2)

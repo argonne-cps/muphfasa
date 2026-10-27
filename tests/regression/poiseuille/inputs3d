@@ -1,0 +1,32 @@
+# Regression test: plane Poiseuille flow, 3-D (channel between z=0 and z=H,
+# periodic in x and y, force along x). See inputs for the 2-D description.
+# Run with lbm.lattice_type=D3Q15 / D3Q27 on the command line for the others.
+
+grid.ncells      = 4 4 32     # Nx Ny Nz (periodic in x,y, walls at z=0 and z=H)
+grid.max_grid_size = 32
+grid.n_ghost     = 1
+
+sim.max_step     = 25600
+sim.stop_time    = -1.0
+
+lbm.lattice_type = D3Q19
+
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.Re            = 32.0
+
+forcing.accel = 0.125  0.0  0.0
+
+bc.lo_type = Periodic  Periodic  NoSlip
+bc.hi_type = Periodic  Periodic  NoSlip
+
+geometry.prob_lo    = 0.0  0.0  0.0
+geometry.prob_hi    = 0.125  0.125  1.0
+
+amr.plot_int        = 5120
+amr.chk_int         = 25601
+amr.plot_file       = plt
+amr.check_file      = chk
+
+# Observed final profile error is ~5e-4 of U_max; tolerance is ~3x that.
+test.max_rel_err = 1.5e-3
