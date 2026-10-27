@@ -37,7 +37,7 @@ struct PressureOutletKernel
             const amrex::IntVect src = iv + c;
             if (!(domain.contains(src) && f.contains(src))) { continue; }
 
-            // velocity of the source cell
+            // velocity of the source cell (should resuse Macroscpic here)
             amrex::Real rho = 0.0;
             amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> j{AMREX_D_DECL(0., 0., 0.)};
             for (int m = 0; m < LatticeTag::Q; ++m) {
