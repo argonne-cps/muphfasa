@@ -1,0 +1,86 @@
+name: Unit tests
+
+# Builds and runs the muphfasa unit test suite for both 2-D and 3-D
+# (D2Q9 in 2-D; D3Q15/D3Q19/D3Q27 in 3-D). Covers lattice, macroscopic,
+# equilibrium, BC corners/edges, mass conservation, and forcing kernels.
+# See tests/CMakeLists.txt and tests/GNUmakefile for the test definitions.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/unit/**'
+      - 'tests/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - 'external/amrex'
+      - '.github/workflows/unit-tests.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/unit/**'
+      - 'tests/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - 'external/amrex'
+      - '.github/workflows/unit-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    name: DIM=${{ matrix.dim }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        dim: [2, 3]
+    steps:
+      - name: Check out repository (with AMReX submodule)
+        uses: actions/checkout@main
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Install ccache and MPI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache libopenmpi-dev openmpi-bin
+
+      - name: Resolve AMReX submodule commit (cache key)
+        id: amrex
+        run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ccache
+        uses: actions/cache@main
+        with:
+          path: ~/.ccache
+          key: unit-tests-ccache-${{ runner.os }}-dim${{ matrix.dim }}-amrex-${{ steps.amrex.outputs.sha }}
+          restore-keys: |
+            unit-tests-ccache-${{ runner.os }}-dim${{ matrix.dim }}-amrex-
+            unit-tests-ccache-${{ runner.os }}-dim${{ matrix.dim }}-
+
+      - name: Configure ccache
+        run: |
+          echo "/usr/lib/ccache" >> "$GITHUB_PATH"
+          echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+          ccache --zero-stats || true
+
+      - name: Configure (CMake, DIM=${{ matrix.dim }})
+        run: >
+          cmake -S . -B build
+          -Dmuphfasa_DIM=${{ matrix.dim }}
+          -Dmuphfasa_BUILD_TESTS=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache
+
+      - name: Build unit tests (DIM=${{ matrix.dim }})
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Run unit tests (DIM=${{ matrix.dim }})
+        run: ctest --test-dir build --output-on-failure -R "^test_"
+
+      - name: Show ccache stats
+        if: always()
+        run: ccache --show-stats || true
