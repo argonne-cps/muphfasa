@@ -125,22 +125,39 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
                    const amrex::MultiFab& f_mf,
                    amrex::Real            omega);
 
-// Per-tile kernel fused stream/collide: pulls (streams) 
+// Per-tile kernel fused stream/collide: pulls (streams)
 // then computes rho, u, and f^eq per cell and immediately
-// relaxes f toward it into fstar_arr. rho/u/feq are local per-cell scratch,
-// not written out to MultiFabs
+// relaxes f toward it into fstar_out_arr. rho/u/feq are local per-cell scratch,
+// not written out to MultiFabs.
 template <typename LatticeTag, typename CollisionModel>
 void pullCollideFullArr(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& fstar_in_arr,
-                    amrex::Array4<const amrex::Real> const& fstar_out_arr,
+                    amrex::Array4<amrex::Real> const& fstar_out_arr,
                     amrex::Real omega);
 
-// Full stream/collision step: Pulls from f then collides 
+// Forced variant: half-force-corrected velocity (Guo scheme) and Guo
+// force term added after BGK relaxation. F is constant body force in
+// lattice units; u used for feq and guoForceTerm is (sum c f + F/2)/rho.
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullArr(const amrex::Box& box,
+                    amrex::Array4<const amrex::Real> const& fstar_in_arr,
+                    amrex::Array4<amrex::Real> const& fstar_out_arr,
+                    amrex::Real omega,
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
+
+// Full stream/collision step: Pulls from f then collides
 // w/ fused rho/u/feq/fstar computation in one MFIter pass.
 template <typename LatticeTag, typename CollisionModel>
 void pullCollideFullMF(const amrex::MultiFab& fin_mf,
                        amrex::MultiFab& fout_mf,
                        amrex::Real omega);
+
+// Forced variant (body force F, lattice units).
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullMF(const amrex::MultiFab& fin_mf,
+                       amrex::MultiFab& fout_mf,
+                       amrex::Real omega,
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
 
 
 } // namespace muphfasa

@@ -205,6 +205,45 @@ void pullCollideFullArr(const amrex::Box& box,
     });
 }
 
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullArr(const amrex::Box& box,
+                    amrex::Array4<const amrex::Real> const& fstar_in_arr,
+                    amrex::Array4<amrex::Real> const& fstar_out_arr,
+                    amrex::Real omega,
+                    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+
+        // scratch array
+        amrex::GpuArray<amrex::Real, LatticeTag::Q> f;
+        // stream f*_in --> f (scratch)
+        for (int n=0; n < LatticeTag::Q; ++n){
+            f[n] = streamCell<LatticeTag>(fstar_in_arr, i, j, k, n);
+        }
+
+        // calc rho
+        const amrex::Real rho = computeDensityCell<LatticeTag>(f);
+
+        // calc u (half-force corrected, Guo scheme)
+#if (AMREX_SPACEDIM == 2)
+        const auto u = computeVelocityCell2D<LatticeTag>(f, rho, F);
+#else
+        const auto u = computeVelocityCell3D<LatticeTag>(f, rho, F);
+#endif
+
+        // calc fstar for each comp
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+#if (AMREX_SPACEDIM == 2)
+            const amrex::Real feq_n = computeEquilibriumCell2D<LatticeTag>(rho, u, n);
+#else
+            const amrex::Real feq_n = computeEquilibriumCell3D<LatticeTag>(rho, u, n);
+#endif
+            fstar_out_arr(i, j, k, n) = CollisionModel::collide(f[n], feq_n, omega)
+                                      + guoForceTerm<LatticeTag>(n, u, F, omega);
+        }
+    });
+}
+
 // ── MultiFab-level Pull - Full Collide dispatch ──────────────────────────────────
 template <typename LatticeTag, typename CollisionModel>
 void pullCollideFullMF(const amrex::MultiFab&       fin_mf,
@@ -224,6 +263,32 @@ void pullCollideFullMF(const amrex::MultiFab&       fin_mf,
         amrex::Array4<amrex::Real> const& fstar_out_arr = fout_mf[mfi].array();
 
         pullCollideFullArr<LatticeTag, CollisionModel>(tileBox, fstar_in_arr, fstar_out_arr, omega);
+    }
+
+    // sync for profiling and safety
+    amrex::Gpu::streamSynchronize();
+}
+
+// ── MultiFab-level Pull - Full Collide dispatch ──────────────────────────────────
+template <typename LatticeTag, typename CollisionModel>
+void pullCollideFullMF(const amrex::MultiFab&       fin_mf,
+                       amrex::MultiFab& fout_mf,
+                       amrex::Real     omega,
+                       amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+
+    BL_PROFILE("pullCollideFullMF(forced)");
+
+    #ifdef _OPENMP
+    #pragma omp parallel
+    #endif
+    for (amrex::MFIter mfi(fin_mf, amrex::TilingIfNotGPU()); mfi.isValid(); ++mfi) {
+        const amrex::Box tileBox = mfi.tilebox();
+
+        amrex::Array4<amrex::Real const> const& fstar_in_arr = fin_mf[mfi].const_array();
+        amrex::Array4<amrex::Real> const& fstar_out_arr = fout_mf[mfi].array();
+
+        pullCollideFullArr<LatticeTag, CollisionModel>(tileBox, fstar_in_arr, fstar_out_arr, omega, F);
     }
 
     // sync for profiling and safety
@@ -260,6 +325,7 @@ template void collideMF<D3Q27, BGK>(amrex::MultiFab&, const amrex::MultiFab&, co
 #if (AMREX_SPACEDIM == 2)
 template void collideFullArr<D2Q9, BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
 template void pullCollideFullArr<D2Q9, BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real);
+template void pullCollideFullArr<D2Q9, BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #else
 template void collideFullArr<D3Q15,BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
 template void collideFullArr<D3Q19,BGK>(const amrex::Box&, amrex::Array4<amrex::Real> const&, amrex::Array4<const amrex::Real> const&, amrex::Real);
@@ -267,11 +333,15 @@ template void collideFullArr<D3Q27,BGK>(const amrex::Box&, amrex::Array4<amrex::
 template void pullCollideFullArr<D3Q15,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real);
 template void pullCollideFullArr<D3Q19,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real);
 template void pullCollideFullArr<D3Q27,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real);
+template void pullCollideFullArr<D3Q15,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void pullCollideFullArr<D3Q19,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void pullCollideFullArr<D3Q27,BGK>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #endif
 
 #if (AMREX_SPACEDIM == 2)
 template void collideFullMF<D2Q9, BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void pullCollideFullMF<D2Q9,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real);
+template void pullCollideFullMF<D2Q9,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #else
 template void collideFullMF<D3Q15,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
 template void collideFullMF<D3Q19,BGK>(amrex::MultiFab&, const amrex::MultiFab&, amrex::Real);
@@ -279,7 +349,9 @@ template void collideFullMF<D3Q27,BGK>(amrex::MultiFab&, const amrex::MultiFab&,
 template void pullCollideFullMF<D3Q15,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real);
 template void pullCollideFullMF<D3Q19,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real);
 template void pullCollideFullMF<D3Q27,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real);
-#
+template void pullCollideFullMF<D3Q15,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void pullCollideFullMF<D3Q19,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
+template void pullCollideFullMF<D3Q27,BGK>(const amrex::MultiFab&, amrex::MultiFab&, amrex::Real, amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const&);
 #endif
 
 } // namespace muphfasa

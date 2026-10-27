@@ -148,6 +148,21 @@ amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::Array4<const amrex:
 
 template <typename LatticeTag>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 2> computeVelocityCell2D(amrex::GpuArray<amrex::Real, LatticeTag::Q> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       amrex::GpuArray<amrex::Real, 2> const& F) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr[n];
+        uy += LatticeTag::cy(n) * f_arr[n];
+    }
+    return {(ux + amrex::Real(0.5) * F[0]) / rho, (uy + amrex::Real(0.5) * F[1]) / rho};
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex::Real> const& f_arr,
                                                        const amrex::Real rho,
                                                        int i, int j, int k,
@@ -160,6 +175,25 @@ amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::Array4<const amrex:
         ux += LatticeTag::cx(n) * f_arr(i, j, k, n);
         uy += LatticeTag::cy(n) * f_arr(i, j, k, n);
         uz += LatticeTag::cz(n) * f_arr(i, j, k, n);
+    }
+    return {(ux + amrex::Real(0.5) * F[0]) / rho,
+            (uy + amrex::Real(0.5) * F[1]) / rho,
+            (uz + amrex::Real(0.5) * F[2]) / rho};
+}
+
+template <typename LatticeTag>
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+amrex::GpuArray<amrex::Real, 3> computeVelocityCell3D(amrex::GpuArray<amrex::Real, LatticeTag::Q> const& f_arr,
+                                                       const amrex::Real rho,
+                                                       amrex::GpuArray<amrex::Real, 3> const& F) noexcept
+{
+    amrex::Real ux = 0.;
+    amrex::Real uy = 0.;
+    amrex::Real uz = 0.;
+    for (int n = 0; n < LatticeTag::Q; ++n) {
+        ux += LatticeTag::cx(n) * f_arr[n];
+        uy += LatticeTag::cy(n) * f_arr[n];
+        uz += LatticeTag::cz(n) * f_arr[n];
     }
     return {(ux + amrex::Real(0.5) * F[0]) / rho,
             (uy + amrex::Real(0.5) * F[1]) / rho,
