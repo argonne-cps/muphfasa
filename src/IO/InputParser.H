@@ -76,6 +76,16 @@ public:
     // bc.hix_rho, ...); faces without the key default to units.ref_density.
     std::array<amrex::Real, 2 * AMREX_SPACEDIM> faceDensity() const;
 
+    // ── Body force ────────────────────────────────────────────────────────
+    // forcing.accel = <ax> [<ay> [<az>]]: uniform body force per unit mass
+    // [m/s^2], applied with the Guo scheme in the collision step. Absent key
+    // -> zero vector, which keeps the force-free fast path (no forcing
+    // kernels run). Validated configurations: periodic streamwise forcing, and
+    // Inflow + PressureOutlet (tests/regression/poiseuille/inputs_inflow). The
+    // zero-gradient Outflow has no density anchor and drifts with NoSlip walls,
+    // so do not pair it with forcing.
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> forcingAccel() const;
+
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;
     int         checkpointInterval() const;

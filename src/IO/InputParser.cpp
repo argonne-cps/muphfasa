@@ -276,6 +276,21 @@ std::array<amrex::Real, 2 * AMREX_SPACEDIM> InputParser::faceDensity() const {
     return rho;
 }
 
+amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> InputParser::forcingAccel() const
+{
+    amrex::ParmParse pp("forcing");
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> accel{};
+    std::vector<amrex::Real> vals{};
+    pp.queryarr("accel", vals);
+    if (vals.empty()) { return accel; } // no forcing
+
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+        static_cast<int>(vals.size()) == AMREX_SPACEDIM,
+        "InputParser: forcing.accel must list exactly AMREX_SPACEDIM components");
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) { accel[d] = vals[d]; }
+    return accel;
+}
+
 int InputParser::plotInterval() const
 {
     amrex::ParmParse pp("amr");

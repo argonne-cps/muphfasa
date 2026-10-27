@@ -9,6 +9,7 @@
 #include "ISimulation.H"
 #include "LBM/BoundaryConditions.H"
 
+#include <AMReX_Array.H>
 #include <AMReX_BoxArray.H>
 #include <AMReX_DistributionMapping.H>
 #include <AMReX_Geometry.H>
@@ -64,6 +65,12 @@ private:
     const InputParser&           m_params;
     std::unique_ptr<UnitConverter> m_units;
     amrex::Real m_omega{};
+
+    // Uniform body force (lattice units). m_has_forcing is cached at
+    // construction so advance() picks the forced or plain kernels once per
+    // step; force-free runs execute exactly the unforced kernels.
+    amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> m_force_lat{};
+    bool m_has_forcing = false;
 
     // ── AMReX grid objects ────────────────────────────────────────────────
     std::unique_ptr<GeometryHandler> m_geom_handler;

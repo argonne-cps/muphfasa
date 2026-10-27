@@ -54,6 +54,13 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // Set collision param: omega = 1/tau.
     m_omega = amrex::Real(1.0) / m_units->relaxationTime();
 
+    // Body force: physical acceleration -> lattice units, cached once.
+    const auto accel_phys = params.forcingAccel();
+    for (int d = 0; d < AMREX_SPACEDIM; ++d) {
+        m_force_lat[d] = m_units->toLatticeAcceleration(accel_phys[d]);
+        if (accel_phys[d] != amrex::Real(0.0)) { m_has_forcing = true; }
+    }
+
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
     if (params.useEB()) {
@@ -97,7 +104,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     // collide
     amrex::Real t0 = amrex::second();
     computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
-    collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_omega);
+    if (m_has_forcing) {
+        collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_vel, m_omega, m_force_lat);
+    } else {
+        collideMF<LatticeTag, CollisionModel>(m_f, m_feq, m_omega);
+    }
     amrex::Real t1 = amrex::second();
     m_t_collide += t1 - t0;
 
@@ -111,7 +122,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance(int step)
     m_t_stream += t3 - t2;
 
     // compute macro
-    computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+    if (m_has_forcing) {
+        computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel, m_force_lat);
+    } else {
+        computeMacroscopic<LatticeTag>(m_f, m_rho, m_vel);
+    }
     amrex::Real t4 = amrex::second();
     m_t_macro += t4 - t3;
 
