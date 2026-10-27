@@ -130,7 +130,7 @@ void collideFullMF(amrex::MultiFab&       fstar_mf,
 // relaxes f toward it into fstar_out_arr. rho/u/feq are local per-cell scratch,
 // not written out to MultiFabs.
 template <typename LatticeTag, typename CollisionModel>
-void pullCollideFullArr(const amrex::Box& box,
+void pullCollideFusedArr(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& fstar_in_arr,
                     amrex::Array4<amrex::Real> const& fstar_out_arr,
                     amrex::Real omega);
@@ -139,7 +139,7 @@ void pullCollideFullArr(const amrex::Box& box,
 // force term added after BGK relaxation. F is constant body force in
 // lattice units; u used for feq and guoForceTerm is (sum c f + F/2)/rho.
 template <typename LatticeTag, typename CollisionModel>
-void pullCollideFullArr(const amrex::Box& box,
+void pullCollideFusedArr(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& fstar_in_arr,
                     amrex::Array4<amrex::Real> const& fstar_out_arr,
                     amrex::Real omega,
@@ -148,13 +148,13 @@ void pullCollideFullArr(const amrex::Box& box,
 // Full stream/collision step: Pulls from f then collides
 // w/ fused rho/u/feq/fstar computation in one MFIter pass.
 template <typename LatticeTag, typename CollisionModel>
-void pullCollideFullMF(const amrex::MultiFab& fin_mf,
+void pullCollideFusedMF(const amrex::MultiFab& fin_mf,
                        amrex::MultiFab& fout_mf,
                        amrex::Real omega);
 
 // Forced variant (body force F, lattice units).
 template <typename LatticeTag, typename CollisionModel>
-void pullCollideFullMF(const amrex::MultiFab& fin_mf,
+void pullCollideFusedMF(const amrex::MultiFab& fin_mf,
                        amrex::MultiFab& fout_mf,
                        amrex::Real omega,
                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);

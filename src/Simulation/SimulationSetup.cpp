@@ -105,9 +105,9 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceFused(int step)
 
     // fused stream then collide
     if (m_has_forcing) {
-        pullCollideFullMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega, m_force_lat);
+        pullCollideFusedMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega, m_force_lat);
     } else {
-        pullCollideFullMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega);
+        pullCollideFusedMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega);
     }
 
     // swap pointers
