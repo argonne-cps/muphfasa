@@ -264,6 +264,18 @@ amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM
     return readPerFaceVelocity(pp, param_Uin, false, true);
 }
 
+std::array<amrex::Real, 2 * AMREX_SPACEDIM> InputParser::faceDensity() const {
+    amrex::ParmParse pp("bc");
+    static const char* keys[6] = {"lox_rho", "hix_rho", "loy_rho", "hiy_rho", "loz_rho", "hiz_rho"};
+    std::array<amrex::Real, 2 * AMREX_SPACEDIM> rho{};
+    for (int i = 0; i < 2 * AMREX_SPACEDIM; ++i) {
+        rho[i] = refDensity();
+        pp.query(keys[i], rho[i]);
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(rho[i] > 0., "InputParser: bc.<face>_rho must be positive");
+    }
+    return rho;
+}
+
 int InputParser::plotInterval() const
 {
     amrex::ParmParse pp("amr");

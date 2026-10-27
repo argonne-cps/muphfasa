@@ -60,7 +60,8 @@ public:
 
     // ── Boundary conditions ───────────────────────────────────────────────
     // bc.lo_type = <x> [<y> [<z>]], bc.hi_type = <x> [<y> [<z>]], one name
-    // per direction, each "NoSlip" | "Inflow" | "Outflow" | "Periodic"
+    // per direction, each "NoSlip" | "MovingWall" | "Inflow" | "Outflow" | "PressureOutlet" |
+    // "Periodic"
     // Returned array order matches muphfasa::faceIndex(dir, bound) in
     // BoundaryConditions.H: [xlo, xhi, ylo, yhi, zlo, zhi].
     std::array<std::string, 2 * AMREX_SPACEDIM> bcNames() const;
@@ -70,6 +71,10 @@ public:
     // Uwall() but with no restriction on the normal component (inflow
     // velocity is expected to point into the domain).
     amrex::GpuArray<amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>, 2 * AMREX_SPACEDIM> Uinflow() const;
+
+    // Per-face density [kg/m^3] for PressureOutlet faces (bc.lox_rho,
+    // bc.hix_rho, ...); faces without the key default to units.ref_density.
+    std::array<amrex::Real, 2 * AMREX_SPACEDIM> faceDensity() const;
 
     // ── Output ───────────────────────────────────────────────────────────
     int         plotInterval()       const;
