@@ -37,7 +37,7 @@ set(UNIT_TEST_NAMES
     test_units
     test_bc_corners
     test_mass_conservation
-    test_inflow_profile
+    test_forcing
 )
 
 foreach(test_name IN LISTS UNIT_TEST_NAMES)
@@ -66,8 +66,6 @@ function(add_regression_test name)
     )
 endfunction()
 
-add_regression_test(poiseuille)
-add_regression_test(lid2d)
 
 # Regression tests that need their own analysis code (e.g. comparing against
 # an analytic solution) instead of just checking the solver runs to
@@ -93,9 +91,16 @@ function(add_regression_analysis_test name)
         setup_target_for_cuda_compilation(test_${name})
     endif()
 
+    # 3D builds use inputs3d when the test provides one (the 2D "inputs" names
+    # a D2Q9 lattice, which a 3D build rejects).
+    set(input_file inputs)
+    if(muphfasa_DIM EQUAL 3 AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/regression/${name}/inputs3d)
+        set(input_file inputs3d)
+    endif()
+
     add_test(
         NAME regression_${name}
-        COMMAND $<TARGET_FILE:test_${name}> inputs
+        COMMAND $<TARGET_FILE:test_${name}> ${input_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/regression/${name}
     )
 endfunction()
@@ -103,3 +108,17 @@ endfunction()
 add_regression_analysis_test(couette)
 add_regression_analysis_test(tgv2d ${CMAKE_CURRENT_SOURCE_DIR}/regression/tgv2d/InitData.cpp)
 add_regression_analysis_test(lid2d)
+add_regression_analysis_test(poiseuille)
+# Same executable, inflow / PressureOutlet configuration (inputs_inflow in 2D,
+# inputs3d_inflow in 3D).
+if(muphfasa_DIM EQUAL 3)
+    set(poiseuille_inflow_input inputs3d_inflow)
+else()
+    set(poiseuille_inflow_input inputs_inflow)
+endif()
+add_test(
+    NAME regression_poiseuille_inflow
+    COMMAND $<TARGET_FILE:test_poiseuille> ${poiseuille_inflow_input}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/regression/poiseuille
+)
+add_regression_analysis_test(uniform_force)
