@@ -113,8 +113,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceFused(int step)
     // swap pointers
     std::swap(m_fin, m_fout);
 
-    // fill ghost and stream
+    // fill ghost
     fillGhostCells();
+
+    // update time
+    m_time += amrex::Real(1.0);
 }
 
 template <typename LatticeTag, typename CollisionModel>
