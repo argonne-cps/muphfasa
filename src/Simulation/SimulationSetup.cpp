@@ -211,6 +211,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
     const auto rhoWall = m_units->toLatticeDensity(m_params.refDensity());
     auto Uwall = m_params.Uwall();
     auto Uin = m_params.Uinflow();
+    const auto faceRho = m_params.faceDensity();
     for (int wall_idx=0; wall_idx < 2 * AMREX_SPACEDIM; ++wall_idx) {
         for (int dim=0; dim < AMREX_SPACEDIM; ++dim) {
             Uwall[wall_idx][dim] = m_units->toLatticeVelocity(Uwall[wall_idx][dim]);
@@ -246,6 +247,11 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir]);
                 else if (bound == 1)
                     bc_manager.setFaceVel(dir, bound, Uin[2*dir+1]);
+            } else if (name == "PressureOutlet") {
+                bc_manager.setFaceDensity(dir, bound,
+                    m_units->toLatticeDensity(faceRho[faceIndex(dir, bound)]));
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
+                bc_manager.setFaceVel(dir, bound, zero);
             } else if (name == "Outflow") {
                 bc_manager.setFaceDensity(dir, bound, rhoWall);
                 amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> zero{AMREX_D_DECL(0.,0.,0.)};
