@@ -1,0 +1,29 @@
+# Regression test: uniform body force on a fully periodic 3-D box. See inputs.
+# Run with lbm.lattice_type=D3Q15 / D3Q19 / D3Q27 on the command line.
+
+grid.ncells      = 8 8 8
+grid.max_grid_size = 8
+grid.n_ghost     = 1
+
+sim.max_step     = 29
+sim.stop_time    = -1.0
+
+lbm.lattice_type = D3Q19
+
+units.ref_length    = 1.0
+units.ref_velocity  = 1.0
+units.Re            = 32.0
+
+# Different value per component so a swapped/dropped component is caught.
+forcing.accel = 0.02 -0.01 0.015
+
+bc.lo_type = Periodic  Periodic  Periodic
+bc.hi_type = Periodic  Periodic  Periodic
+
+geometry.prob_lo    = 0.0  0.0  0.0
+geometry.prob_hi    = 1.0  1.0  1.0
+
+amr.plot_int        = 1000
+amr.chk_int         = 100000
+amr.plot_file       = plt
+amr.check_file      = chk
