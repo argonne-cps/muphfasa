@@ -211,7 +211,7 @@ int main(int argc, char* argv[])
 
         sample(); // t=0, at rest
         for (int step = 0; step <= max_step; ++step) {
-            sim->advance(step);
+            sim->advanceSep(step);
             sim->writeOutput(step);
             if (step % every == 0) { sample(); }
         }

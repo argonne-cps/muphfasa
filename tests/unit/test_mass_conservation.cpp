@@ -1,12 +1,12 @@
 // test_mass_conservation.cpp — Closed-box mass conservation via ISimulation.
-// All walls NoSlip (bounce-back), quiescent init (rho=1, u=0), N advance() steps.
+// All walls NoSlip (bounce-back), quiescent init (rho=1, u=0), N advanceSep() steps.
 // Total mass (sum rho over valid cells) must be conserved to ~1e-12.
 //
 // This mirrors the regression drivers in tests/regression/tgv2d/test_tgv2d.cpp
 // and tests/regression/couette/test_couette.cpp:
 //   InputParser params; auto sim = makeSimulation(params); sim->initialize();
-//   for (step) { sim->advance(step); sim->writeOutput(step); }
-// Here we exercise the same ISimulation::advance() path (collide -> FillBoundary
+//   for (step) { sim->advanceSep(step); sim->writeOutput(step); }
+// Here we exercise the same ISimulation::advanceSep() path (collide -> FillBoundary
 // -> BC -> stream -> macroscopic) instead of hand-rolling collide/stream in
 // the test. Both single-box and multi-box (max_grid_size < domain) layouts are
 // exercised: multi-box guards against wall BCs being skipped for boxes that
@@ -142,7 +142,7 @@ static void runMassConservationTest(const char* tag,
 
     // Advance exactly like src/main.cpp / regression tests
     for (int step = 0; step < Nsteps; ++step) {
-        sim->advance(step);
+        sim->advanceSep(step);
     }
 
     const amrex::Real m1 = totalMassRho(sim->rho());
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
     amrex::Initialize(argc, argv);
     {
         amrex::Print() << "\n=== Closed-box mass conservation (DIM="
-                       << AMREX_SPACEDIM << ") via ISimulation::advance() ===\n";
+                       << AMREX_SPACEDIM << ") via ISimulation::advanceSep() ===\n";
 
 #if (AMREX_SPACEDIM == 2)
         // 2-D
