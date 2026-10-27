@@ -11,8 +11,9 @@ lbmBCtype parselbmBCtype(const std::string& name)
     if (name == "NoSlip")      { return lbmBCtype::NoSlip;  }
     if (name == "Inflow")      { return lbmBCtype::Inflow;  }
     if (name == "Outflow")     { return lbmBCtype::Outflow; }
+    if (name == "PressureOutlet") { return lbmBCtype::PressureOutlet; }
     amrex::Abort("parselbmBCtype: unrecognized BC name \"" + name +
-                 "\" (expected MovingWall, NoSlip, Inflow, or Outflow; Periodic faces "
+                 "\" (expected MovingWall, NoSlip, Inflow, Outflow, or PressureOutlet; Periodic faces "
                  "must be filtered out before calling this)");
     return lbmBCtype::NoSlip;
 }
@@ -36,13 +37,14 @@ amrex::Vector<amrex::BCRec> makeBCRecVector(
 bool hasConflictingBC(const amrex::Vector<lbmBCtype>& face_types) noexcept {
     bool conflict = false;
 
-    // check inflow/outflow
-    bool has_inflow = false, has_outflow = false;
+    // at most one of Inflow / Outflow / PressureOutlet per edge/corner
+    bool has_inflow = false, has_outflow = false, has_pressure = false;
     for (auto t : face_types) {
         if (t == lbmBCtype::Inflow) has_inflow = true;
         if (t == lbmBCtype::Outflow) has_outflow = true;
+        if (t == lbmBCtype::PressureOutlet) has_pressure = true;
     }
-    conflict = has_inflow && has_outflow;
+    conflict = (has_inflow + has_outflow + has_pressure) > 1;
 
     // check two moving walls (currently not supported)
     int nMoving = 0;

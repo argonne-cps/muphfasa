@@ -4,11 +4,13 @@
 //
 // Ghost population rule: for ghost g, population n is needed iff g + c_n is
 // inside geom.Domain(); source cell is g + c_n; BounceBack: f(g,n)=f(src,opp)+contrib,
-// Outflow: f(g,n)=f(src,n). This covers faces, edges, and corners uniformly
+// Outflow: f(g,n)=f(src,n), PressureOutlet: anti-bounce-back at fixed density.
+// This covers faces, edges, and corners uniformly
 //
-// Priority resolution at edges/corners: NoSlip(3) > MovingWall(2) > Inflow(1) > Outflow(0).
-// Winner type among touching faces determines BC; rho/U are averaged over
-// faces of the winning type only. Inflow+Outflow together aborts.
+// Priority resolution at edges/corners: NoSlip(3) > MovingWall(2) > Inflow(1) >
+// Outflow = PressureOutlet(0). Winner type among touching faces determines BC;
+// rho/U are averaged over faces of the winning type only. Inflow, Outflow and
+// PressureOutlet meeting at one edge/corner (any two of them) aborts.
 
 #ifndef MUPHFASA_BOUNDARY_CONDITIONS_H
 #define MUPHFASA_BOUNDARY_CONDITIONS_H
@@ -17,6 +19,7 @@
 #include "BCTypes/NoSlipKernel.H"
 #include "BCTypes/InflowKernel.H"
 #include "BCTypes/OutflowKernel.H"
+#include "BCTypes/PressureOutletKernel.H"
 
 #include <AMReX_Array.H>
 #include <AMReX_BCRec.H>
@@ -35,7 +38,7 @@ inline constexpr int faceIndex(int dir, int bound) noexcept {
     return 2 * dir + (bound < 0 ? 0 : 1);
 }
 
-enum class lbmBCtype { MovingWall, NoSlip, Inflow, Outflow, Periodic };
+enum class lbmBCtype { MovingWall, NoSlip, Inflow, Outflow, PressureOutlet, Periodic };
 
 inline constexpr int kCustomBCSentinel = amrex::BCType::user_1;
 static_assert(kCustomBCSentinel != amrex::BCType::int_dir &&
@@ -75,6 +78,7 @@ inline int bcRank(lbmBCtype t) noexcept {
         case lbmBCtype::MovingWall: return 2;
         case lbmBCtype::Inflow:     return 1;
         case lbmBCtype::Outflow:    return 0;
+        case lbmBCtype::PressureOutlet: return 0;
         case lbmBCtype::Periodic:   return -1;
     }
     return -1;
@@ -89,7 +93,7 @@ struct ResolvedFaceBC {
 
 // Resolve touching faces to a single BC. Host-side, unit-testable.
 // face_types/rho/U are parallel arrays of length nfaces (faces that meet at ghost).
-// Aborts if both Inflow and Outflow present.
+// Aborts if two of Inflow/Outflow/PressureOutlet are present.
 ResolvedFaceBC resolveBC(
     const amrex::Vector<lbmBCtype>& face_types,
     const amrex::Vector<amrex::Real>& face_rho,
@@ -164,6 +168,9 @@ public:
                 break;
             case lbmBCtype::Outflow:
                 OutflowKernel<LatticeTag>::apply(iv, dest, domain);
+                break;
+            case lbmBCtype::PressureOutlet:
+                PressureOutletKernel<LatticeTag>::apply(iv, dest, domain, rbc.rho);
                 break;
             case lbmBCtype::Periodic:
                 return;
