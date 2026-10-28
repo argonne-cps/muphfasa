@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
 
         const int max_step = params.maxStep();
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceSep(step);
+            sim->advanceFused(step);
             sim->writeOutput(step);
         }
     }
