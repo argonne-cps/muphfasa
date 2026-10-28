@@ -166,7 +166,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
 {
     BL_PROFILE("SimulationImpl::writeOutput()");
 
-    if (step % m_params.plotInterval() == 0) {
+    if (m_params.plotInterval() > 0 && step % m_params.plotInterval() == 0) {
 
         // compute macroscopic NOTE: need to stream fstar_in first.
         // This is kind of wasted computation
