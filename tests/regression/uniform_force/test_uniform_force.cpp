@@ -58,11 +58,14 @@ int main(int argc, char* argv[])
             const amrex::MultiFab& vel = sim->vel();
             const amrex::MultiFab& rho = sim->rho();
             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-                const amrex::Real expected = amrex::Real(k) * F[d] / rho0;
-                const amrex::Real vmax = vel.max(d);
-                const amrex::Real vmin = vel.min(d);
-                worst_u = std::max({worst_u, std::abs(vmax - expected), std::abs(vmin - expected)});
-                worst_spread = std::max(worst_spread, vmax - vmin);
+                if (step % params.plotInterval() == 0 ) {
+                    sim->writeOutput(step);
+                    const amrex::Real expected = amrex::Real(k) * F[d] / rho0;
+                    const amrex::Real vmax = vel.max(d);
+                    const amrex::Real vmin = vel.min(d);
+                    worst_u = std::max({worst_u, std::abs(vmax - expected), std::abs(vmin - expected)});
+                    worst_spread = std::max(worst_spread, vmax - vmin);
+                }
             }
             worst_rho = std::max({worst_rho, std::abs(rho.max(0) - rho0), std::abs(rho.min(0) - rho0)});
         }
