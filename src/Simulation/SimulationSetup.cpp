@@ -171,7 +171,13 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
         // compute macroscopic NOTE: need to stream fstar_in first.
         // This is kind of wasted computation
         stream<LatticeTag>(m_fin, m_fout, m_geom);
+        
+    if (!m_has_forcing) {
         computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
+    }
+    else {
+        computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel, m_force_lat);
+    }
 
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         // Plotfiles are written in physical (SI) units; solver state stays lattice.
