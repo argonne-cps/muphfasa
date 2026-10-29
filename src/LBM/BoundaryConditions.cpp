@@ -64,7 +64,7 @@ ResolvedFaceBC resolveBC(
 {
     if (hasConflictingBC(face_types)) {
         std::string msg = "resolveBC: conflicting bound conditions at same edge/corner (faces:";
-        for (size_t i = 0; i < face_names.size(); ++i) msg += " " + face_names[i];
+        for (int i = 0; i < face_names.size(); ++i) msg += " " + face_names[i];
         msg += ")";
         amrex::Abort(msg);
     }
@@ -80,7 +80,7 @@ ResolvedFaceBC resolveBC(
     amrex::Real sum_rho = 0;
     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> sum_U{AMREX_D_DECL(0.,0.,0.)};
     int count = 0;
-    for (size_t i = 0; i < face_types.size(); ++i) {
+    for (int i = 0; i < face_types.size(); ++i) {
         if (face_types[i] == winner) {
             sum_rho += face_rho[i];
             for (int d = 0; d < AMREX_SPACEDIM; ++d) sum_U[d] += face_U[i][d];
