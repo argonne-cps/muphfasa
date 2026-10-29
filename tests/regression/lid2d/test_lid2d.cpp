@@ -10,8 +10,9 @@
 //                  eps   = nu * sum|grad u|^2
 //                from dKE/dt = P_lid - eps (boundary work by the lid minus
 //                dissipation; the other walls do no work since u=0 there).
-//   4. Ghia:     centerline extrema u_min (x=0.5), v_max / v_min (y=0.5)
-//                against Ghia, Ghia & Shin (1982), Re=100 -- see README.md.
+//   4. Benchmark: centerline extrema u_min (x=0.5), v_max / v_min (y=0.5) are
+//                checked against Marchi et al. (2009), Re=100 (relative error
+//                < 1% at the default N=64; convergence.py checks the order).
 //
 // Walls/lid are hardwired to the ../inputs.bench layout (NoSlip x-lo/x-hi/y-lo,
 // lid at y-hi moving along +x). Exits nonzero if any check fails.
@@ -25,31 +26,39 @@
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 
+#include <AMReX_ParmParse.H>
+
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <string>
 #include <vector>
 
 using namespace muphfasa;
 
 namespace {
 
-// Ghia, Ghia & Shin (1982), J. Comput. Phys. 48(3), 387-411,
-// doi:10.1016/0021-9991(82)90058-4, Re=100 (Tables I and II), u/U_lid, v/U_lid.
-constexpr amrex::Real kGhiaUmin = amrex::Real(-0.21090);  // at x=0.5,  y=0.4531
-constexpr amrex::Real kGhiaVmax = amrex::Real( 0.17527);  // at y=0.5,  x=0.2344
-constexpr amrex::Real kGhiaVmin = amrex::Real(-0.24533);  // at y=0.5,  x=0.8047
+// Marchi, Suero & Araki (2009), J. Braz. Soc. Mech. Sci. Eng. 31(3), 186-198,
+// doi:10.1590/S1678-58782009000300004: grid-converged Re=100 centerline
+// extrema, u/U_lid and v/U_lid (extrapolated; see README.md).
+constexpr amrex::Real kRefUmin = amrex::Real(-2.140417e-1);  // along x=0.5
+constexpr amrex::Real kRefVmax = amrex::Real( 1.79572814e-1);  // along y=0.5
+constexpr amrex::Real kRefVmin = amrex::Real(-2.53804e-1);     // along y=0.5
 
 // Pass/fail tolerances (see README.md for how they were chosen).
 constexpr amrex::Real kTolMass    = amrex::Real(1e-9);  // relative drift in sum(rho)
 constexpr amrex::Real kTolMono    = amrex::Real(1e-3);  // allowed relative KE dip between samples
 constexpr amrex::Real kTolPlateau = amrex::Real(1e-4);  // relative KE change over last sample interval
 constexpr amrex::Real kTolBalance = amrex::Real(0.20);  // |P_lid - eps| / P_lid at steady state
-constexpr amrex::Real kTolGhia    = amrex::Real(0.03);  // relative error on each centerline extremum
+constexpr amrex::Real kTolBench   = amrex::Real(0.01);  // relative error on each centerline extremum
 
 constexpr amrex::Real kCs2 = amrex::Real(1.0) / amrex::Real(3.0);
 
 struct Sample {
+    int step;  // number of advance() calls completed
     amrex::Real time, mass, ke, power, eps;
+    amrex::Real umin, vmax, vmin;  // centerline extrema / u_lid (see centerlineExtrema)
 };
 
 // Lid power P_lid and dissipation eps (lattice units, dx=dt=1, per unit depth).
@@ -158,6 +167,47 @@ void centerlineProfiles(const amrex::MultiFab& vel, int N, amrex::Real u_lid,
     amrex::ParallelDescriptor::ReduceRealSum(v_of_x.data(), N);
 }
 
+struct CenterlineExtrema {
+    amrex::Real umin, ypos, vmax, xmax, vmin, xmin;
+};
+
+CenterlineExtrema centerlineExtrema(const std::vector<amrex::Real>& u_of_y,
+                                    const std::vector<amrex::Real>& v_of_x)
+{
+    CenterlineExtrema e{};
+    extremum(u_of_y, -1, e.umin, e.ypos);
+    extremum(v_of_x, +1, e.vmax, e.xmax);
+    extremum(v_of_x, -1, e.vmin, e.xmin);
+    return e;
+}
+
+// Opt-in diagnostics for convergence.py / plot_lid2d.py (off unless lid2d.csv_prefix is set):
+//   <prefix>_history.csv     one row per sample (step, time, mass, KE, power, eps, extrema)
+//   <prefix>_centerline.csv  final u(y)/u_lid at x=0.5 and v(x)/u_lid at y=0.5, cell-centered
+void writeHistoryCsv(const std::string& path, const std::vector<Sample>& hist)
+{
+    if (!amrex::ParallelDescriptor::IOProcessor()) { return; }
+    std::ofstream out(path);
+    out << std::setprecision(17) << "step,time,mass,ke,power,eps,umin,vmax,vmin\n";
+    for (const auto& s : hist) {
+        out << s.step << ',' << s.time << ',' << s.mass << ',' << s.ke << ',' << s.power << ','
+            << s.eps << ',' << s.umin << ',' << s.vmax << ',' << s.vmin << '\n';
+    }
+}
+
+void writeCenterlineCsv(const std::string& path, const std::vector<amrex::Real>& u_of_y,
+                        const std::vector<amrex::Real>& v_of_x)
+{
+    if (!amrex::ParallelDescriptor::IOProcessor()) { return; }
+    const int N = static_cast<int>(u_of_y.size());
+    std::ofstream out(path);
+    out << std::setprecision(17) << "coord,u_of_y,v_of_x\n";
+    for (int m = 0; m < N; ++m) {
+        out << (amrex::Real(m) + amrex::Real(0.5)) / amrex::Real(N) << ',' << u_of_y[m] << ','
+            << v_of_x[m] << '\n';
+    }
+}
+
 bool report(const char* name, bool ok, const char* detail)
 {
     amrex::Print() << (ok ? "PASS  " : "FAIL  ") << name << ": " << detail << "\n";
@@ -194,26 +244,46 @@ int main(int argc, char* argv[])
         const amrex::Real nu = (sim->units().relaxationTime() - amrex::Real(0.5)) * kCs2;
 
         const int max_step = params.maxStep();
-        const int every = params.plotInterval();
         const amrex::Geometry& geom = sim->geom();
 
+        // Optional knobs, only used by convergence.py / plot_lid2d.py:
+        //   lid2d.sample_int  diagnostic sampling interval (default: amr.plot_int)
+        //   lid2d.csv_prefix  write <prefix>_history.csv / <prefix>_centerline.csv
+        int every = params.plotInterval();
+        std::string csv_prefix;
+        {
+            amrex::ParmParse pp("lid2d");
+            pp.query("sample_int", every);
+            pp.query("csv_prefix", csv_prefix);
+        }
+        AMREX_ALWAYS_ASSERT_WITH_MESSAGE(every > 0, "test_lid2d: lid2d.sample_int must be > 0");
+
         std::vector<Sample> hist;
-        auto sample = [&]() {
+        auto sample = [&](int nsteps) {
+            // advanceFused() leaves rho/vel stale; refresh them from f before reading.
+            // Not at t=0: rho/vel are exactly the rest state there, and the refresh
+            // streams once, which would already inject lid momentum.
+            if (nsteps > 0) { sim->updateMacroscopic(); }
             Sample s;
+            s.step = nsteps;
             s.time = sim->time();
             s.mass = sim->rho().sum(0);
             s.ke   = amrex::Real(0.5) * amrex::MultiFab::Dot(sim->vel(), 0, sim->vel().nComp(), 0);
             computePowerAndDissipation(sim->vel(), geom, u_lid, nu, s.power, s.eps);
+            std::vector<amrex::Real> u_of_y, v_of_x;
+            centerlineProfiles(sim->vel(), N, u_lid, u_of_y, v_of_x);
+            const CenterlineExtrema e = centerlineExtrema(u_of_y, v_of_x);
+            s.umin = e.umin; s.vmax = e.vmax; s.vmin = e.vmin;
             hist.push_back(s);
             amrex::Print() << "At Time=" << s.time << ": KE=" << s.ke << " P_lid=" << s.power
                            << " eps=" << s.eps << " mass=" << s.mass << "\n";
         };
 
-        sample(); // t=0, at rest
+        sample(0); // t=0, at rest
         for (int step = 0; step <= max_step; ++step) {
             sim->advanceFused(step);
             sim->writeOutput(step);
-            if (step % every == 0) { sample(); }
+            if (step % every == 0 || step == max_step) { sample(step + 1); }
         }
 
         amrex::Print() << "\n--- lid2d validation (N=" << N << ", U_lid=" << u_lid
@@ -252,19 +322,22 @@ int main(int argc, char* argv[])
         // 4. Ghia centerline extrema
         std::vector<amrex::Real> u_of_y, v_of_x;
         centerlineProfiles(sim->vel(), N, u_lid, u_of_y, v_of_x);
-        amrex::Real umin, ypos, vmax, xmax, vmin, xmin;
-        extremum(u_of_y, -1, umin, ypos);
-        extremum(v_of_x, +1, vmax, xmax);
-        extremum(v_of_x, -1, vmin, xmin);
-        auto ghia = [&](const char* name, amrex::Real val, amrex::Real pos, amrex::Real ref) {
+        const CenterlineExtrema ext = centerlineExtrema(u_of_y, v_of_x);
+        const amrex::Real umin = ext.umin, ypos = ext.ypos, vmax = ext.vmax, xmax = ext.xmax,
+                          vmin = ext.vmin, xmin = ext.xmin;
+        if (!csv_prefix.empty()) {
+            writeHistoryCsv(csv_prefix + "_history.csv", hist);
+            writeCenterlineCsv(csv_prefix + "_centerline.csv", u_of_y, v_of_x);
+        }
+        auto benchmark = [&](const char* name, amrex::Real val, amrex::Real pos, amrex::Real ref) {
             const amrex::Real err = std::abs(val - ref) / std::abs(ref);
-            return report(name, err < kTolGhia,
-                          fmt("%.5f at %.4f vs Ghia %.5f", val, pos, ref).append(
-                              fmt(" (rel err %.2e, tol 3e-2)", err)).c_str());
+            return report(name, err < kTolBench,
+                          fmt("%.5f at %.4f vs Marchi %.5f", val, pos, ref).append(
+                              fmt(" (rel err %.2e, tol 1e-2)", err)).c_str());
         };
-        all_ok &= ghia("Ghia u_min (x=0.5)", umin, ypos, kGhiaUmin);
-        all_ok &= ghia("Ghia v_max (y=0.5)", vmax, xmax, kGhiaVmax);
-        all_ok &= ghia("Ghia v_min (y=0.5)", vmin, xmin, kGhiaVmin);
+        all_ok &= benchmark("benchmark u_min (x=0.5)", umin, ypos, kRefUmin);
+        all_ok &= benchmark("benchmark v_max (y=0.5)", vmax, xmax, kRefVmax);
+        all_ok &= benchmark("benchmark v_min (y=0.5)", vmin, xmin, kRefVmin);
 
         amrex::Print() << (all_ok ? "ALL CHECKS PASSED\n" : "SOME CHECKS FAILED\n");
     }
