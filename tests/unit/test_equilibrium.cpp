@@ -40,24 +40,8 @@ using namespace muphfasa;
 static constexpr amrex::Real kTol = 1e-12;
 
 //------------------------------------------------------------------------------
-// Small helpers — keep test logic readable
+// Small helper
 //------------------------------------------------------------------------------
-
-template <typename LatticeTag>
-static amrex::Real equilibrium2D(amrex::Real rho,
-                                 amrex::GpuArray<amrex::Real, 2> const& u,
-                                 int q)
-{
-    return computeEquilibriumCell2D<LatticeTag>(rho, u, q);
-}
-
-template <typename LatticeTag>
-static amrex::Real equilibrium3D(amrex::Real rho,
-                                 amrex::GpuArray<amrex::Real, 3> const& u,
-                                 int q)
-{
-    return computeEquilibriumCell3D<LatticeTag>(rho, u, q);
-}
 
 static void requireClose(amrex::Real got, amrex::Real expected,
                          amrex::Real tol, const std::string& what)
@@ -86,7 +70,7 @@ static void checkMassAndMomentum(const char* lattice_name,
     // Compute all populations.
     std::vector<amrex::Real> feq(LatticeTag::Q);
     for (int q = 0; q < LatticeTag::Q; ++q) {
-        feq[q] = equilibrium2D<LatticeTag>(rho, u, q);
+        feq[q] = computeEquilibriumCell2D<LatticeTag>(rho, u, q);
     }
 
     // Zeroth moment: sum fEq == rho
@@ -144,7 +128,7 @@ static void testRoundTripViaMacroscopic(const char* lattice_name,
 
     auto f_arr = f_fab.array();
     for (int q = 0; q < LatticeTag::Q; ++q) {
-        f_arr(0,0,0,q) = equilibrium2D<LatticeTag>(rho, u, q);
+        f_arr(0,0,0,q) = computeEquilibriumCell2D<LatticeTag>(rho, u, q);
     }
 
     // Use the muphfasa macroscopic helpers to recompute moments.
@@ -169,7 +153,7 @@ static void checkMassAndMomentum(const char* lattice_name,
 {
     std::vector<amrex::Real> feq(LatticeTag::Q);
     for (int q = 0; q < LatticeTag::Q; ++q) {
-        feq[q] = equilibrium3D<LatticeTag>(rho, u, q);
+        feq[q] = computeEquilibriumCell3D<LatticeTag>(rho, u, q);
     }
 
     amrex::Real mass = 0.0;
@@ -222,7 +206,7 @@ static void testRoundTripViaMacroscopic(const char* lattice_name,
 
     auto f_arr = f_fab.array();
     for (int q = 0; q < LatticeTag::Q; ++q) {
-        f_arr(0,0,0,q) = equilibrium3D<LatticeTag>(rho, u, q);
+        f_arr(0,0,0,q) = computeEquilibriumCell3D<LatticeTag>(rho, u, q);
     }
 
     auto f_const = f_fab.const_array();
@@ -295,7 +279,7 @@ static void testMultiFabPath(const char* lattice_name)
 
                 // Check feq values match the inline kernel.
                 for (int q = 0; q < LatticeTag::Q; ++q) {
-                    const amrex::Real expected = equilibrium2D<LatticeTag>(rho, u, q);
+                    const amrex::Real expected = computeEquilibriumCell2D<LatticeTag>(rho, u, q);
                     const amrex::Real got = feq_arr(i,j,0,q);
                     requireClose(got, expected, kTol,
                         std::string(lattice_name) + " MultiFab feq vs kernel");
@@ -373,7 +357,7 @@ static void testMultiFabPath(const char* lattice_name)
                     amrex::GpuArray<amrex::Real,3> u{
                         vel_arr(i,j,k,0), vel_arr(i,j,k,1), vel_arr(i,j,k,2)};
                     for (int q = 0; q < LatticeTag::Q; ++q) {
-                        const amrex::Real expected = equilibrium3D<LatticeTag>(rho, u, q);
+                        const amrex::Real expected = computeEquilibriumCell3D<LatticeTag>(rho, u, q);
                         const amrex::Real got = feq_arr(i,j,k,q);
                         requireClose(got, expected, kTol,
                             std::string(lattice_name) + " MultiFab feq vs kernel");
