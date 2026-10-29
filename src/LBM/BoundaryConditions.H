@@ -60,12 +60,19 @@ inline constexpr int numCodes() noexcept {
 #endif
 }
 
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+constexpr int ipow3(int d) noexcept {
+    int r = 1;
+    for (int i = 0; i < d; ++i) r *= 3;
+    return r;
+}
+
 // get index of m_resolved_bc for ghost cell
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 int ghostClass(const amrex::IntVect& code) noexcept {
     int idx = 0;
     for (int d = 0; d < AMREX_SPACEDIM; ++d) {
-        idx += (code[d] + 1) * std::pow(3, d);
+        idx += (code[d] + 1) * ipow3(d);
     }
     return idx;
 }

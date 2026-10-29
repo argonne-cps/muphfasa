@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
             const amrex::MultiFab& rho = sim->rho();
             for (int d = 0; d < AMREX_SPACEDIM; ++d) {
                 if (step % params.plotInterval() == 0 ) {
-                    sim->writeOutput(step);
+                    sim->updateMacroscopic();
                     const amrex::Real expected = amrex::Real(k) * F[d] / rho0;
                     const amrex::Real vmax = vel.max(d);
                     const amrex::Real vmin = vel.min(d);

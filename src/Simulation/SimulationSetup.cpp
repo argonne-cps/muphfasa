@@ -168,16 +168,13 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceSep(int step)
     m_time += amrex::Real(1.0);
 }
 
+
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
+void SimulationImpl<LatticeTag, CollisionModel>::updateMacroscopic()
 {
-    BL_PROFILE("SimulationImpl::writeOutput()");
-
-    if (m_params.plotInterval() > 0 && step % m_params.plotInterval() == 0) {
-
-        // compute macroscopic NOTE: need to stream fstar_in first.
-        // This is kind of wasted computation
-        stream<LatticeTag>(m_fin, m_fout, m_geom);
+    // compute macroscopic NOTE: need to stream fstar_in first.
+    // This is kind of wasted computation
+    stream<LatticeTag>(m_fin, m_fout, m_geom);
         
     if (!m_has_forcing) {
         computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
@@ -185,6 +182,16 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
     else {
         computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel, m_force_lat);
     }
+}
+
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
+{
+    BL_PROFILE("SimulationImpl::writeOutput()");
+
+    if (m_params.plotInterval() > 0 && step % m_params.plotInterval() == 0) {
+
+        updateMacroscopic();
 
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         // Plotfiles are written in physical (SI) units; solver state stays lattice.

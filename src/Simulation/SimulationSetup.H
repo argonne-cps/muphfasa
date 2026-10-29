@@ -43,11 +43,15 @@ public:
     // Allocate MultiFabs, set initial conditions, and fill ghost cells.
     void initialize() override;
 
-    // Advance by one time step: collision -> streaming -> boundary conditions
-    // -> macroscopic update.
+    // Advance by one time step: 
+    // Fused Kernel for streaming -> collision -> boundary conditions
     void advanceFused(int step) override;
+    // Seperat Kernels for collision -> streaming -> boundary conditions
+    // -> macroscopic update.
     void advanceSep(int step) override;
 
+    // update density and velocity inbetween steps 
+    void updateMacroscopic() override;
     // Write plotfile and/or checkpoint when the output intervals are hit.
     void writeOutput(int step) override;
 
