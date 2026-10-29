@@ -1,7 +1,7 @@
-# Correctness test: 2-D lid-driven cavity, global checks + Ghia centerline extrema.
+# Correctness test: 2-D lid-driven cavity, global checks + benchmark centerline extrema.
 # Same physics as ../inputs.bench (closed square cavity, Re=100, lid at y=hi);
 # test_lid2d.cpp runs it from rest to steady state and checks mass conservation,
-# KE spin-up/plateau, steady-state power balance and Ghia et al. (1982) values
+# KE spin-up/plateau, steady-state power balance and Marchi et al. (2009) values
 # (see README.md).
 
 # ── Grid ──────────────────────────────────────────────────────────────────
