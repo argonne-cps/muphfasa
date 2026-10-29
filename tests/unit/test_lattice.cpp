@@ -39,6 +39,8 @@ void testOppositeInvolution()
         if (LatticeTag::opposite(r) != q)
             throw std::runtime_error("opposite[] is not an involution at q="
                                      + std::to_string(q));
+        if (std::abs(LatticeTag::weights(r) - LatticeTag::weights(q)) > 1e-14)
+            throw std::runtime_error("opposite weights differ at q=" + std::to_string(q));
     }
     amrex::Print() << "  [PASS] opposite[] involution  (Q=" << LatticeTag::Q << ")\n";
 }
@@ -54,8 +56,6 @@ void testOppositeNegation()
             if (LatticeTag::cz(r) != -LatticeTag::cz(q))
                 throw std::runtime_error("opposite[] does not negate cz at q=" + std::to_string(q));
         }
-        if (std::abs(LatticeTag::weights(r) - LatticeTag::weights(q)) > 1e-14)
-            throw std::runtime_error("opposite weights differ at q=" + std::to_string(q));
     }
     amrex::Print() << "  [PASS] opposite[] negation  (Q=" << LatticeTag::Q << ")\n";
 }
@@ -104,6 +104,14 @@ void testIsotropy()
 }
 
 template <typename LatticeTag>
+void testSoundSpeed()
+{
+        if (std::abs(LatticeTag::cs2 - 1./3.) > 1e-12)
+            throw std::runtime_error("cs2 !=1/3");
+        amrex::Print() << "  [PASS] cs2==1/3\n";
+}
+
+template <typename LatticeTag>
 void runAll(const char* name)
 {
     amrex::Print() << " Testing " << name << " (D=" << LatticeTag::D << " Q=" << LatticeTag::Q << ")\n";
@@ -112,6 +120,7 @@ void runAll(const char* name)
     testOppositeNegation<LatticeTag>();
     testUniqueness<LatticeTag>();
     testIsotropy<LatticeTag>();
+    testSoundSpeed<LatticeTag>();
 }
 
 } // anonymous namespace
@@ -126,10 +135,6 @@ int main(int argc, char* argv[])
         runAll<muphfasa::D3Q15>("D3Q15");
         runAll<muphfasa::D3Q19>("D3Q19");
         runAll<muphfasa::D3Q27>("D3Q27");
-
-        if (std::abs(muphfasa::D2Q9::cs2 - 1./3.) > 1e-12)
-            throw std::runtime_error("cs2 !=1/3");
-        amrex::Print() << "  [PASS] cs2==1/3\n";
 
         amrex::Print() << "All lattice tests passed.\n";
     }
