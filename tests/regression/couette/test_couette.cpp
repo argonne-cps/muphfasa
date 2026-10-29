@@ -100,12 +100,12 @@ void calcAnalytic(amrex::MultiFab& vel, amrex::Real H, amrex::Real U0,
 void calcError(const std::unique_ptr<ISimulation>& sim,
                std::vector<amrex::Real>& max_err,
                const std::string& analytic_file, 
-               amrex::Real H, amrex::Real U0, amrex::Real nu)
+               amrex::Real H, amrex::Real U0, amrex::Real nu,
+               int step)
 {
     // calc_analytic vel in lattice then convert to physical
     const amrex::MultiFab& sim_vel = sim->vel();
     const amrex::MultiFab& sim_rho = sim->rho();
-    const int step = sim->time();
 
     amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
                                  sim_vel.nComp(), sim_vel.nGrow());
@@ -113,9 +113,9 @@ void calcError(const std::unique_ptr<ISimulation>& sim,
                                  sim_rho.nComp(), 0);
     amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
 
-    calcAnalytic(analytic_vel, H, U0, nu, step);
+    calcAnalytic(analytic_vel, H, U0, nu, sim->time());
     sim->units().toPhysical(analytic_rho, analytic_vel);
-    const amrex::Real t_phys = sim->units().toPhysicalTime(step);
+    const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
 
     // write out analytic file
     muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
@@ -177,14 +177,14 @@ int main(int argc, char* argv[])
             // write out analytic soln (both plt and analytic_plt are physical)
             if (step % params.plotInterval() == 0 && params.plotInterval() > 0) {
                 // calc error
-                calcError(sim, max_err, analytic_file, H, U0, nu);
+                calcError(sim, max_err, analytic_file, H, U0, nu, step);
             }
         }
 
         // calc final error if no writes
         if (params.plotInterval() < 0 ){
                 sim->updateMacroscopic();
-                calcError(sim, max_err, analytic_file, H, U0, nu);
+                calcError(sim, max_err, analytic_file, H, U0, nu, max_step);
         }
 
         // compute final error
