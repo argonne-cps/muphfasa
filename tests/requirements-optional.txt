@@ -4,4 +4,4 @@
 #     pip install -r tests/requirements-optional.txt
 # yt is heavier and more fragile than numpy/matplotlib, so it deliberately
 # stays out of requirements.txt. Dependabot still tracks this file.
-yt>=4.3,<5
+yt>=4.4.3,<5
