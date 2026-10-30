@@ -114,6 +114,7 @@ amrex::Real UnitConverter::toLatticeVelocity (amrex::Real u_phys)   const noexce
 amrex::Real UnitConverter::toLatticeTime     (amrex::Real t_phys)   const noexcept { return t_phys / m_dt; }
 amrex::Real UnitConverter::toLatticeViscosity(amrex::Real nu_phys)  const noexcept { return nu_phys * m_dt / (m_dx * m_dx); }
 amrex::Real UnitConverter::toLatticeAcceleration(amrex::Real a_phys) const noexcept { return a_phys * m_dt * m_dt / m_dx; }
+amrex::Real UnitConverter::toLatticeEnergy(amrex::Real a_phys) const noexcept { return a_phys * (m_dt * m_dt) / (m_dx * m_dx)/ m_rho_ref; }
 amrex::Real UnitConverter::toLatticeDensity    (amrex::Real rho_phys) const noexcept { return rho_phys / m_rho_ref; }
 
 amrex::Real UnitConverter::toPhysicalLength   (amrex::Real x_lat)   const noexcept { return x_lat * m_dx; }
@@ -121,6 +122,7 @@ amrex::Real UnitConverter::toPhysicalVelocity (amrex::Real u_lat)   const noexce
 amrex::Real UnitConverter::toPhysicalTime     (amrex::Real t_lat)   const noexcept { return t_lat * m_dt; }
 amrex::Real UnitConverter::toPhysicalViscosity(amrex::Real nu_lat)  const noexcept { return nu_lat * m_dx * m_dx / m_dt; }
 amrex::Real UnitConverter::toPhysicalAcceleration(amrex::Real a_lat) const noexcept { return a_lat * m_dx / (m_dt * m_dt); }
+amrex::Real UnitConverter::toPhysicalEnergy(amrex::Real a_phys) const noexcept { return a_phys * (m_dx * m_dx) / (m_dt * m_dt) * m_rho_ref; }
 amrex::Real UnitConverter::toPhysicalDensity  (amrex::Real rho_lat) const noexcept { return rho_lat * m_rho_ref; }
 
 void UnitConverter::toPhysical(amrex::MultiFab& rho, amrex::MultiFab& vel) const noexcept

@@ -14,10 +14,22 @@ together, independent of the wall treatment.
 
 ## Build and run
 ```sh
-make DIM=2                  # test_uniform_force2d.gnu.ex
+# GNUMake (from this directory — defaults to DIM=2, no MPI)
+make DIM=2                  # -> test_uniform_force2d.gnu.ex
 ./test_uniform_force2d.gnu.ex inputs
-make DIM=3                  # test_uniform_force3d.gnu.ex
+make DIM=3                  # -> test_uniform_force3d.gnu.ex
 ./test_uniform_force3d.gnu.ex inputs3d lbm.lattice_type=D3Q27   # also D3Q15, D3Q19
+
+# CMake (from repo root)
+cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build2d -j$(nproc) --target test_uniform_force
+build2d/tests/test_uniform_force tests/regression/uniform_force/inputs
+ctest --test-dir build2d -R uniform_force --output-on-failure
+
+# 3-D CMake
+cmake -S . -B build -Dmuphfasa_DIM=3 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build -j$(nproc) --target test_uniform_force
+build/tests/test_uniform_force tests/regression/uniform_force/inputs3d
 ```
 Different relaxation times (the result must not depend on `tau`):
 ```sh

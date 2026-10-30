@@ -10,9 +10,18 @@ density/velocity fields this relies on.
 
 ## Build and run
 
+This test is 2-D only (`D2Q9`, `inputs`).
+
 ```sh
-make                      # builds test_tgv2d2d.gnu.ex (DIM=2, no MPI)
+# GNUMake (from this directory — DIM=2, no MPI)
+make                      # -> test_tgv2d2d.gnu.ex
 ./test_tgv2d2d.gnu.ex inputs
+
+# CMake (from repo root)
+cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build2d -j$(nproc) --target test_tgv2d
+build2d/tests/test_tgv2d tests/regression/tgv2d/inputs
+ctest --test-dir build2d -R tgv2d --output-on-failure
 ```
 
 ## Expected result

@@ -47,6 +47,7 @@ public:
     amrex::Real toLatticeTime     (amrex::Real t_phys)   const noexcept;
     amrex::Real toLatticeViscosity(amrex::Real nu_phys)  const noexcept;
     amrex::Real toLatticeAcceleration(amrex::Real a_phys) const noexcept;  // body force per unit mass
+    amrex::Real toLatticeEnergy(amrex::Real a_phys) const noexcept;  
     amrex::Real toLatticeDensity    (amrex::Real rho_phys) const noexcept;
 
     // ── Lattice → physical ───────────────────────────────────────────────
@@ -55,6 +56,7 @@ public:
     amrex::Real toPhysicalTime     (amrex::Real t_lat)   const noexcept;
     amrex::Real toPhysicalViscosity(amrex::Real nu_lat)  const noexcept;
     amrex::Real toPhysicalAcceleration(amrex::Real a_lat) const noexcept;
+    amrex::Real toPhysicalEnergy(amrex::Real a_phys) const noexcept;  
     amrex::Real toPhysicalDensity  (amrex::Real rho_lat) const noexcept;
 
     // ── Dimensionless parameters ─────────────────────────────────────────

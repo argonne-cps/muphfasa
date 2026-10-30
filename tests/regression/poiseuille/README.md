@@ -28,12 +28,24 @@ correction, so the delivered flux is `Uin (1 - 1/(3H))`; the inputs set
 
 ## Build and run
 ```sh
-make DIM=2                  # test_poiseuille2d.gnu.ex
+# GNUMake (from this directory — defaults to DIM=2, no MPI)
+make DIM=2                  # -> test_poiseuille2d.gnu.ex
 ./test_poiseuille2d.gnu.ex inputs
 ./test_poiseuille2d.gnu.ex inputs_inflow   # Inflow / PressureOutlet
-make DIM=3                  # test_poiseuille3d.gnu.ex
+make DIM=3                  # -> test_poiseuille3d.gnu.ex
 ./test_poiseuille3d.gnu.ex inputs3d      # lbm.lattice_type=D3Q15/D3Q27 for the others
 ./test_poiseuille3d.gnu.ex inputs3d_inflow
+
+# CMake (from repo root)
+cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build2d -j$(nproc) --target test_poiseuille
+build2d/tests/test_poiseuille tests/regression/poiseuille/inputs
+ctest --test-dir build2d -R poiseuille --output-on-failure
+
+# 3-D CMake
+cmake -S . -B build -Dmuphfasa_DIM=3 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build -j$(nproc) --target test_poiseuille
+build/tests/test_poiseuille tests/regression/poiseuille/inputs3d
 ```
 
 ## Convergence study
