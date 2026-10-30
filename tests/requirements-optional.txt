@@ -1,0 +1,7 @@
+# Optional Python dependencies -- NOT needed by CI. Install only for the
+# plotting features that use them, e.g. tests/regression/tgv2d/plot_tgv2d.py
+# reads the solver's plotfiles with yt:
+#     pip install -r tests/requirements-optional.txt
+# yt is heavier and more fragile than numpy/matplotlib, so it deliberately
+# stays out of requirements.txt. Dependabot still tracks this file.
+yt>=4.3,<5

@@ -19,7 +19,8 @@ Usage:
     make                     # build test_tgv2d2d.gnu.ex, if not already
     python3 plot_tgv2d.py    # runs the solver, then plots
 
-Requires numpy + matplotlib + yt (`pip install yt`).
+Requires numpy + matplotlib (tests/requirements.txt) plus the optional yt
+(tests/requirements-optional.txt; `pip install -r tests/requirements-optional.txt`).
 """
 
 import argparse

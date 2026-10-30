@@ -38,7 +38,8 @@ field is read instead), and plots:
 
 ```sh
 make                   # build test_tgv2d2d.gnu.ex, if not already built
-pip install yt         # one-time, if not already installed
+pip install -r ../../requirements-optional.txt  # one-time; optional yt dep
+                                                # (from repo root: tests/requirements-optional.txt)
 python3 plot_tgv2d.py  # runs the solver, then plots
 ```
 
