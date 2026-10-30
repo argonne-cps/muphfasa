@@ -64,7 +64,14 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // Setup Geometry of Problem
     m_geom_handler = std::make_unique<GeometryHandler>(params);
     if (params.useEB()) {
+#ifdef AMREX_USE_EB
         m_geom_handler->initEB(params.geometryType());
+#else
+        amrex::Abort(
+            "inputs: geometry.use_eb=1 but muphfasa was built without EB "
+            "support; rebuild with USE_EB=TRUE (GNUMake) or "
+            "-Dmuphfasa_ENABLE_EB=ON (CMake)");
+#endif
     }
     m_geom_handler->buildBoxArray(params.maxGridSize());
 

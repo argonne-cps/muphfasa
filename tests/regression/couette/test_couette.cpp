@@ -16,8 +16,8 @@
 // For 3D the same holds with y→z and H=Nz; faverage (DIM=3) averages over
 // x-y and returns the z-profile, matching the wall normal.
 //
-// This test produces two sets of plotfiles from the sim (pltxxxxx/) and
-// from the analytic soln (analytic_pltxxxxx/)
+// This test produces two sets of plotfiles from the sim (pltxxxxxxx/) and
+// from the analytic soln (analytic_pltxxxxxxx/)
 // These can then be compared via amrex/Tools/Plotfiles/fcompare
 
 #include <AMReX.H>
@@ -96,6 +96,52 @@ void calcAnalytic(amrex::MultiFab& vel, amrex::Real H, amrex::Real U0,
     }
 }
 
+// calculate the error between current sim state and the analytic soln
+void calcError(const std::unique_ptr<ISimulation>& sim,
+               std::vector<amrex::Real>& max_err,
+               const std::string& analytic_file, 
+               amrex::Real H, amrex::Real U0, amrex::Real nu,
+               int step)
+{
+    // calc_analytic vel in lattice then convert to physical
+    const amrex::MultiFab& sim_vel = sim->vel();
+    const amrex::MultiFab& sim_rho = sim->rho();
+
+    amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                 sim_vel.nComp(), sim_vel.nGrow());
+    amrex::MultiFab analytic_rho(sim_rho.boxArray(), sim_rho.DistributionMap(),
+                                 sim_rho.nComp(), 0);
+    amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
+
+    calcAnalytic(analytic_vel, H, U0, nu, sim->time());
+    sim->units().toPhysical(analytic_rho, analytic_vel);
+    const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
+
+    // write out analytic file
+    muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
+                                 analytic_rho, analytic_vel, sim->geom(), t_phys, step);
+
+    // calc error in physical units
+    amrex::MultiFab sim_vel_phys(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                                 sim_vel.nComp(), 0);
+    amrex::MultiFab::Copy(sim_vel_phys, sim_vel, 0, 0, sim_vel.nComp(), 0);
+    sim->units().toPhysicalVelocity(sim_vel_phys);
+    amrex::MultiFab diff(sim_vel.boxArray(), sim_vel.DistributionMap(),
+                         sim_vel.nComp(), 0);
+    amrex::MultiFab::Copy(diff, analytic_vel, 0, 0, sim_vel.nComp(), 0);
+    diff.minus(sim_vel_phys, 0, sim_vel.nComp(), 0);
+    diff.abs(0, sim_vel.nComp(), 0);
+
+    amrex::Real diff_max = diff.max(0);
+    if (std::isnan(diff_max)) {
+        amrex::Print() << "WARNING: NaN in diff at step " << step << "\n";
+        max_err.push_back(-1.0);
+    } else {
+        max_err.push_back(diff_max);
+        amrex::Print() << "At Time=" << step << ": Error=" << diff_max << "\n";
+    }
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -119,9 +165,8 @@ int main(int argc, char* argv[])
 
         const int max_step   = params.maxStep();
         std::vector<amrex::Real> max_err;
-        std::vector<amrex::Real> avg_err;
 
-        // create copy of velocity mf for analytic soln
+        // file prefix to plot out analytic soln
         const std::string analytic_file = "analytic_plt";
 
         // run simulation
@@ -130,44 +175,16 @@ int main(int argc, char* argv[])
             sim->writeOutput(step);
 
             // write out analytic soln (both plt and analytic_plt are physical)
-            if (step % params.plotInterval() == 0) {
-                // calc_analytic vel in lattice then convert to physical
-                const amrex::MultiFab& sim_vel = sim->vel();
-                const amrex::MultiFab& sim_rho = sim->rho();
-                amrex::MultiFab analytic_vel(sim_vel.boxArray(), sim_vel.DistributionMap(),
-                                             sim_vel.nComp(), sim_vel.nGrow());
-                amrex::MultiFab analytic_rho(sim_rho.boxArray(), sim_rho.DistributionMap(),
-                                             sim_rho.nComp(), 0);
-                amrex::MultiFab::Copy(analytic_rho, sim_rho, 0, 0, sim_rho.nComp(), 0);
-
-                calcAnalytic(analytic_vel, H, U0, nu, sim->time());
-                sim->units().toPhysical(analytic_rho, analytic_vel);
-                const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
-
-                // write out file
-                muphfasa::writeMacroPlotfile(plotfileName(analytic_file, step),
-                                             analytic_rho, analytic_vel, sim->geom(), t_phys, step);
-
-                // calc error in physical units
-                amrex::MultiFab sim_vel_phys(sim_vel.boxArray(), sim_vel.DistributionMap(),
-                                             sim_vel.nComp(), 0);
-                amrex::MultiFab::Copy(sim_vel_phys, sim_vel, 0, 0, sim_vel.nComp(), 0);
-                sim->units().toPhysicalVelocity(sim_vel_phys);
-                amrex::MultiFab diff(sim_vel.boxArray(), sim_vel.DistributionMap(),
-                                     sim_vel.nComp(), 0);
-                amrex::MultiFab::Copy(diff, analytic_vel, 0, 0, sim_vel.nComp(), 0);
-                diff.minus(sim_vel_phys, 0, sim_vel.nComp(), 0);
-                diff.abs(0, sim_vel.nComp(), 0);
-
-                amrex::Real diff_max = diff.max(0);
-                if (std::isnan(diff_max)) {
-                    amrex::Print() << "WARNING: NaN in diff at step " << step << "\n";
-                    max_err.push_back(-1.0);
-                } else {
-                    max_err.push_back(diff_max);
-                    amrex::Print() << "At Time=" << step << ": Error=" << diff_max << "\n";
-                }
+            if (step % params.plotInterval() == 0 && params.plotInterval() > 0) {
+                // calc error
+                calcError(sim, max_err, analytic_file, H, U0, nu, step);
             }
+        }
+
+        // calc final error if no writes
+        if (params.plotInterval() < 0 ){
+                sim->updateMacroscopic();
+                calcError(sim, max_err, analytic_file, H, U0, nu, max_step);
         }
 
         // compute final error

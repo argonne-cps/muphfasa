@@ -19,7 +19,7 @@ AMREX_HOME ?= $(TOP)/external/amrex
 # unless the including GNUmakefile overrides them -- this project's top-level
 # GNUmakefile wants MPI on by default, while the regression tests want a
 # quick, dependency-light local build, so neither default belongs here.
-USE_EB ?= TRUE
+USE_EB ?= FALSE
 
 # No Fortran sources in this project.
 BL_NO_FORT = TRUE
@@ -36,7 +36,10 @@ include $(AMREX_HOME)/Tools/GNUMake/Make.defs
 # Boundary: ghost-cell/boundary-fill infrastructure, used by the EB module
 # AmrCore : Interpolater base class, used by the EB module
 # EB      : embedded-boundary geometry (AMReX_EB2.H, AMReX_EBFabFactory.H)
-Pdirs := Base Boundary AmrCore EB
+Pdirs := Base Boundary AmrCore
+ifeq ($(USE_EB),TRUE)
+  Pdirs += EB
+endif
 Bpack += $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
 
 include $(Bpack)

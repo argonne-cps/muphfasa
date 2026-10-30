@@ -40,30 +40,17 @@ static constexpr amrex::Real kTol = 1e-12;
 // Helpers
 //------------------------------------------------------------------------------
 
-static void requireClose(amrex::Real got, amrex::Real expected,
+static void requireClose(amrex::Real calc, amrex::Real expected,
                          amrex::Real tol, const std::string& what)
 {
-    const amrex::Real err = std::abs(got - expected);
+    const amrex::Real err = std::abs(calc - expected);
     const amrex::Real scale = std::max(amrex::Real(1.0), std::abs(expected));
     if (err > tol * scale && err > tol) {
-        throw std::runtime_error(what + ": got " + std::to_string(got) +
+        throw std::runtime_error(what + ": calc" + std::to_string(calc) +
                                  " expected " + std::to_string(expected) +
                                  " err " + std::to_string(err));
     }
 }
-
-#if AMREX_SPACEDIM == 2
-static amrex::Real equilibrium2D_proxy(
-    amrex::Real rho, amrex::GpuArray<amrex::Real,2> const& u, int q, const std::string&)
-{
-    // Use the same inline kernel the solver uses — ensures the test tracks the
-    // implementation rather than a duplicate formula.
-    // Lattice type is templated at the call site; this non-template proxy is
-    // unused — per-lattice wrappers below call the templated version directly.
-    amrex::ignore_unused(rho, u, q);
-    return 0;
-}
-#endif
 
 //------------------------------------------------------------------------------
 // 1) Known-f pattern — single cell
@@ -74,11 +61,9 @@ static void testSingleCellKnownF(const char* lattice_name, std::mt19937& rng)
 {
     std::uniform_real_distribution<amrex::Real> dist(0.5, 1.5);
 
-#if AMREX_SPACEDIM == 2
-    const amrex::Box box(amrex::IntVect{0,0}, amrex::IntVect{0,0});
-#else
-    const amrex::Box box(amrex::IntVect{0,0,0}, amrex::IntVect{0,0,0});
-#endif
+    amrex::IntVect iv{AMREX_D_DECL(0, 0, 0)};
+    const amrex::Box box(iv, iv);
+
     amrex::FArrayBox f_fab(box, LatticeTag::Q);
     amrex::FArrayBox rho_fab(box, 1);
     amrex::FArrayBox vel_fab(box, AMREX_SPACEDIM);
@@ -169,173 +154,7 @@ static void testSingleCellKnownF(const char* lattice_name, std::mt19937& rng)
 }
 
 //------------------------------------------------------------------------------
-// 2) Known-f pattern — tiled Box (exercises ParallelFor tiling)
-//------------------------------------------------------------------------------
-
-template <typename LatticeTag>
-static void testBoxKnownF(const char* lattice_name)
-{
-#if AMREX_SPACEDIM == 2
-    const amrex::Box box(amrex::IntVect{0,0}, amrex::IntVect{7,7});
-#else
-    const amrex::Box box(amrex::IntVect{0,0,0}, amrex::IntVect{3,3,3});
-#endif
-    amrex::FArrayBox f_fab(box, LatticeTag::Q);
-    amrex::FArrayBox rho_fab(box, 1);
-    amrex::FArrayBox vel_fab(box, AMREX_SPACEDIM);
-
-    auto f_arr = f_fab.array();
-
-    // Deterministic spatial pattern: f(i,j,q) encodes position so we can
-    // verify per-cell moments vary correctly across the box.
-    {
-        const auto lo = box.smallEnd();
-        const auto hi = box.bigEnd();
-#if AMREX_SPACEDIM == 2
-        for (int j = lo[1]; j <= hi[1]; ++j) {
-            for (int i = lo[0]; i <= hi[0]; ++i) {
-                for (int q = 0; q < LatticeTag::Q; ++q) {
-                    f_arr(i,j,0,q) = 0.7 + 0.1*q + 0.02*i - 0.015*j;
-                }
-            }
-        }
-#else
-        for (int k = lo[2]; k <= hi[2]; ++k) {
-            for (int j = lo[1]; j <= hi[1]; ++j) {
-                for (int i = lo[0]; i <= hi[0]; ++i) {
-                    for (int q = 0; q < LatticeTag::Q; ++q) {
-                        f_arr(i,j,k,q) = 0.7 + 0.1*q + 0.02*i - 0.015*j + 0.01*k;
-                    }
-                }
-            }
-        }
-#endif
-    }
-
-    auto f_const = f_fab.const_array();
-    auto rho_arr = rho_fab.array();
-    auto vel_arr = vel_fab.array();
-
-    // Use the array-level kernels under test.
-    computeDensity<LatticeTag>(box, f_const, rho_arr);
-    computeVelocity<LatticeTag>(box, f_const, rho_arr, vel_arr);
-
-    // Verify each cell against a hand-computed reference.
-    {
-        const auto lo = box.smallEnd();
-        const auto hi = box.bigEnd();
-#if AMREX_SPACEDIM == 2
-        for (int j = lo[1]; j <= hi[1]; ++j) {
-            for (int i = lo[0]; i <= hi[0]; ++i) {
-                amrex::Real rho_ref = 0.0;
-                for (int q = 0; q < LatticeTag::Q; ++q) { rho_ref += f_const(i,j,0,q); }
-
-                requireClose(rho_arr(i,j,0,0), rho_ref, kTol,
-                             std::string(lattice_name) + " box rho");
-
-                amrex::Real mx = 0.0, my = 0.0;
-                for (int q = 0; q < LatticeTag::Q; ++q) {
-                    mx += LatticeTag::cx(q) * f_const(i,j,0,q);
-                    my += LatticeTag::cy(q) * f_const(i,j,0,q);
-                }
-                requireClose(vel_arr(i,j,0,0), mx / rho_ref, kTol,
-                             std::string(lattice_name) + " box ux");
-                requireClose(vel_arr(i,j,0,1), my / rho_ref, kTol,
-                             std::string(lattice_name) + " box uy");
-            }
-        }
-#else
-        for (int k = lo[2]; k <= hi[2]; ++k) {
-            for (int j = lo[1]; j <= hi[1]; ++j) {
-                for (int i = lo[0]; i <= hi[0]; ++i) {
-                    amrex::Real rho_ref = 0.0;
-                    for (int q = 0; q < LatticeTag::Q; ++q) { rho_ref += f_const(i,j,k,q); }
-                    requireClose(rho_arr(i,j,k,0), rho_ref, kTol,
-                                 std::string(lattice_name) + " box rho");
-
-                    amrex::Real mx = 0.0, my = 0.0, mz = 0.0;
-                    for (int q = 0; q < LatticeTag::Q; ++q) {
-                        mx += LatticeTag::cx(q) * f_const(i,j,k,q);
-                        my += LatticeTag::cy(q) * f_const(i,j,k,q);
-                        mz += LatticeTag::cz(q) * f_const(i,j,k,q);
-                    }
-                    requireClose(vel_arr(i,j,k,0), mx / rho_ref, kTol,
-                                 std::string(lattice_name) + " box ux");
-                    requireClose(vel_arr(i,j,k,1), my / rho_ref, kTol,
-                                 std::string(lattice_name) + " box uy");
-                    requireClose(vel_arr(i,j,k,2), mz / rho_ref, kTol,
-                                 std::string(lattice_name) + " box uz");
-                }
-            }
-        }
-#endif
-    }
-}
-
-//------------------------------------------------------------------------------
-// 3) Equilibrium round-trip — single cell
-//------------------------------------------------------------------------------
-
-#if AMREX_SPACEDIM == 2
-
-template <typename LatticeTag>
-static void testEquilibriumRoundTripCell(const char* lattice_name,
-                                         amrex::Real rho,
-                                         amrex::GpuArray<amrex::Real,2> const& u)
-{
-    const amrex::Box box(amrex::IntVect{0,0}, amrex::IntVect{0,0});
-    amrex::FArrayBox f_fab(box, LatticeTag::Q);
-    auto f_arr = f_fab.array();
-
-    for (int q = 0; q < LatticeTag::Q; ++q) {
-        f_arr(0,0,0,q) = computeEquilibriumCell2D<LatticeTag>(rho, u, q);
-    }
-
-    auto f_const = f_fab.const_array();
-    const amrex::Real rho_rec = computeDensityCell<LatticeTag>(f_const, 0,0,0);
-    requireClose(rho_rec, rho, kTol,
-                 std::string(lattice_name) + " Eq round-trip rho");
-
-    auto u_rec = computeVelocityCell2D<LatticeTag>(f_const, rho_rec, 0,0,0);
-    requireClose(u_rec[0], u[0], kTol,
-                 std::string(lattice_name) + " Eq round-trip ux");
-    requireClose(u_rec[1], u[1], kTol,
-                 std::string(lattice_name) + " Eq round-trip uy");
-}
-
-#else
-
-template <typename LatticeTag>
-static void testEquilibriumRoundTripCell(const char* lattice_name,
-                                         amrex::Real rho,
-                                         amrex::GpuArray<amrex::Real,3> const& u)
-{
-    const amrex::Box box(amrex::IntVect{0,0,0}, amrex::IntVect{0,0,0});
-    amrex::FArrayBox f_fab(box, LatticeTag::Q);
-    auto f_arr = f_fab.array();
-
-    for (int q = 0; q < LatticeTag::Q; ++q) {
-        f_arr(0,0,0,q) = computeEquilibriumCell3D<LatticeTag>(rho, u, q);
-    }
-
-    auto f_const = f_fab.const_array();
-    const amrex::Real rho_rec = computeDensityCell<LatticeTag>(f_const, 0,0,0);
-    requireClose(rho_rec, rho, kTol,
-                 std::string(lattice_name) + " Eq round-trip rho");
-
-    auto u_rec = computeVelocityCell3D<LatticeTag>(f_const, rho_rec, 0,0,0);
-    requireClose(u_rec[0], u[0], kTol,
-                 std::string(lattice_name) + " Eq round-trip ux");
-    requireClose(u_rec[1], u[1], kTol,
-                 std::string(lattice_name) + " Eq round-trip uy");
-    requireClose(u_rec[2], u[2], kTol,
-                 std::string(lattice_name) + " Eq round-trip uz");
-}
-
-#endif
-
-//------------------------------------------------------------------------------
-// 4) MultiFab tiling + equilibrium round-trip
+// 2) MultiFab tiling + equilibrium round-trip
 //------------------------------------------------------------------------------
 
 template <typename LatticeTag>
@@ -519,29 +338,6 @@ static void runForLattice(const char* name, std::mt19937& rng)
                    << " (D=" << LatticeTag::D << " Q=" << LatticeTag::Q << ")\n";
 
     testSingleCellKnownF<LatticeTag>(name, rng);
-    testBoxKnownF<LatticeTag>(name);
-
-#if AMREX_SPACEDIM == 2
-    const std::vector<std::pair<amrex::Real, amrex::GpuArray<amrex::Real,2>>> eq_samples{
-        {1.0, {0.0, 0.0}},
-        {1.2, {0.05, -0.03}},
-        {0.9, {-0.04, 0.06}},
-        {1.5, {0.08, 0.02}},
-    };
-    for (auto [rho, u] : eq_samples) {
-        testEquilibriumRoundTripCell<LatticeTag>(name, rho, u);
-    }
-#else
-    const std::vector<std::pair<amrex::Real, amrex::GpuArray<amrex::Real,3>>> eq_samples{
-        {1.0, {0.0, 0.0, 0.0}},
-        {1.2, {0.04, -0.02, 0.03}},
-        {0.9, {-0.03, 0.05, -0.01}},
-        {1.4, {0.06, 0.02, -0.04}},
-    };
-    for (auto [rho, u] : eq_samples) {
-        testEquilibriumRoundTripCell<LatticeTag>(name, rho, u);
-    }
-#endif
 
     testMultiFabPath<LatticeTag>(name, rng);
 

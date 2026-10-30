@@ -11,14 +11,24 @@ at the top of `test_couette.cpp` for the full derivation. The single source
 ## Build and run
 
 ```sh
-make DIM=2                  # builds test_couette2d.gnu.ex (default)
+# GNUMake (from this directory — defaults to DIM=2, no MPI for quick runs)
+make DIM=2                  # -> test_couette2d.gnu.ex
 ./test_couette2d.gnu.ex inputs
 
-make DIM=3                  # builds test_couette3d.gnu.ex
+make DIM=3                  # -> test_couette3d.gnu.ex
 ./test_couette3d.gnu.ex inputs3d
-```
 
-`lbm.lattice_type` must match `DIM`: `D2Q9` for 2D (`inputs`), `D3Q19`/`D3Q27`/`D3Q15` for 3D (`inputs3d` defaults to `D3Q19`). Lattices follow Krüger 2017 Tables 3.4–3.6 (`src/LBM/LatticeDescriptor.H`).
+# CMake (from repo root)
+cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build2d -j$(nproc) --target test_couette
+build2d/tests/test_couette tests/regression/couette/inputs
+ctest --test-dir build2d -R couette --output-on-failure
+
+# 3-D CMake
+cmake -S . -B build -Dmuphfasa_DIM=3 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build -j$(nproc) --target test_couette
+build/tests/test_couette tests/regression/couette/inputs3d
+```
 
 ## Expected result
 
@@ -61,11 +71,6 @@ python3 convergence3d.py    # fcompare DIM=3, writes couette3d_convergence.csv/.
 
 Each resolution in `convergence_runs/Ny<N>/` (2D) / `convergence_runs3d/Nz<N>/` (3D) with `run.log`/`fcompare.log`. Table columns `Ny/Nz,dx,target_step,abs_err_vx,order_vx`; order ~2 expected. Flags: `--ny-list/--nz-list 16 32 64 128`, `--tau 0.8`, `--target-time 0.05`, `--min-order 1.8`, `--plot/--no-plot`. Only `vx` tracked (`vy`/`vz` ~0).
 
-## 3D contribution options
-
-- Lattice: `D3Q19` (default, 19 vel), `D3Q27` (full, more isotropic), `D3Q15` (light). Set `lbm.lattice_type` and `DIM=3`; ensure `grid.ncells` is `Nx Ny Nz` with `Nz` wall-normal and BCs `Periodic Periodic NoSlip/MovingWall` (x,y periodic, z walls), e.g. `4 4 32`.
-- Extending: add new `D3Qxx` in `LatticeDescriptor.H` (Krueger ordering), update `SimulationFactory`, and add `inputs*` variant. Verify with `convergence3d.py` (`--nz-list`).
-
 ## CI
 
-`.github/workflows/couette-regression.yml` builds `test_couette2d.gnu.ex` and runs `convergence.py --min-order 2.5` and `plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01`. Extend to 3D by adding `DIM=3` builds of `convergence3d.py`/`plot_couette3d.py`.
+`.github/workflows/couette-regression.yml` builds `test_couette2d.gnu.ex` and runs `convergence.py --min-order 1.8` and `plot_couette.py --max-profile-err 0.01 --max-rate-rel-err 0.01`. Extend to 3D by adding `DIM=3` builds of `convergence3d.py`/`plot_couette3d.py`.

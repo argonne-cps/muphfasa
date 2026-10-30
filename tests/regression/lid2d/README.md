@@ -11,18 +11,18 @@ extrema against a converged literature benchmark (the grid-convergence order is 
 
 ## Build and run
 
+This test is 2-D only (`D2Q9`, `inputs`; N=64, ~3 s on one core).
+
 ```sh
-# GNUMake
+# GNUMake (from this directory — DIM=2)
 make -j6 DIM=2          # -> test_lid2d2d.gnu.ex
-./test_lid2d2d.gnu.ex inputs                      # ~3 s on one CPU core at N=64
+./test_lid2d2d.gnu.ex inputs
 
 # CMake (from repo root)
-cmake -S . -B /tmp/build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
-cmake --build /tmp/build2d -j6 --target test_lid2d
-mpirun -n 1 /tmp/build2d/tests/test_lid2d tests/regression/lid2d/inputs
-
-# ctest (after CMake configure with BUILD_TESTS=ON)
-ctest -R lid2d --output-on-failure
+cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
+cmake --build build2d -j6 --target test_lid2d
+build2d/tests/test_lid2d tests/regression/lid2d/inputs
+ctest --test-dir build2d -R lid2d --output-on-failure
 ```
 
 `sim.max_step=20000`; `amr.plot_int` (1000) doubles as the diagnostic sampling
@@ -127,17 +127,3 @@ Marchi values, not Ghia's, with the test's 3% tolerance then failing at N=128.
 In the test the extrema are taken from the cell-centered profiles along the centerline (the
 two cells straddling x=0.5 / y=0.5 are averaged, N even) and refined with a 3-point
 parabola; only the extremum *value* is compared.
-
-## History
-
-Before the diagonal-population bounce-back fix this test failed with mass drain and
-divergent flow:
-
-```
-FAIL  mass conservation: max relative drift in sum(rho) = 3.6e-01 (tol 1e-9)
-FAIL  Ghia u_min (x=0.5): -0.33757 at 0.4227 vs Ghia -0.21090 (rel err 6.0e-01, tol 3e-2)  [old Ghia check]
-```
-
-Root cause was the old kernel `f(g,n)=f(g-bound*e_dir,opp(n))` which leaked mass at wall
-ends for diagonal `n`. The current `f(g,n)=f(g+c_n,opp(n))` plus edge/corner priority
-resolution (`NoSlip > MovingWall > Inflow > Outflow`) fixes it.

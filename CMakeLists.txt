@@ -18,7 +18,7 @@ option(muphfasa_ENABLE_MPI  "Enable MPI distributed parallelism"   ON)
 option(muphfasa_ENABLE_OMP  "Enable OpenMP threading"              OFF)
 option(muphfasa_ENABLE_CUDA "Enable NVIDIA CUDA GPU backend"       OFF)
 option(muphfasa_ENABLE_HIP  "Enable AMD HIP GPU backend"           OFF)
-option(muphfasa_ENABLE_EB   "Enable AMReX embedded-boundary support" ON)
+option(muphfasa_ENABLE_EB   "Enable AMReX embedded-boundary support" OFF)
 
 if(muphfasa_ENABLE_CUDA AND muphfasa_ENABLE_HIP)
     message(FATAL_ERROR "CUDA and HIP backends are mutually exclusive.")

@@ -5,8 +5,10 @@
 #include "GeometryHandler.H"
 #include "IO/InputParser.H"
 
+#ifdef AMREX_USE_EB
 #include <AMReX_EB2.H>
 #include <AMReX_EBFabFactory.H>
+#endif
 #include <AMReX_Print.H>
 
 namespace muphfasa {
@@ -50,8 +52,14 @@ GeometryHandler::GeometryHandler(const InputParser& params)
 
 void GeometryHandler::initEB(const std::string& /*geom_type*/)
 {
+#ifdef AMREX_USE_EB
     // TODO: call AMReX EB2::Build with the requested implicit-function geometry
     m_has_eb = true;
+#else
+    amrex::Abort(
+        "GeometryHandler::initEB: muphfasa was built without EB support; "
+        "rebuild with USE_EB=TRUE (GNUMake) or -Dmuphfasa_ENABLE_EB=ON (CMake)");
+#endif
 }
 
 void GeometryHandler::buildBoxArray(int max_grid_size)
