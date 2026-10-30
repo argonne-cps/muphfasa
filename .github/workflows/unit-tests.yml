@@ -36,7 +36,7 @@ jobs:
         dim: [2, 3]
     steps:
       - name: Check out repository (with AMReX submodule)
-        uses: actions/checkout@main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 1
@@ -51,7 +51,7 @@ jobs:
         run: echo "sha=$(git -C external/amrex rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Cache ccache
-        uses: actions/cache@main
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.ccache
           key: unit-tests-ccache-${{ runner.os }}-dim${{ matrix.dim }}-amrex-${{ steps.amrex.outputs.sha }}

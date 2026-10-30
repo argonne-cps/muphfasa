@@ -29,18 +29,18 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Check out repository (with AMReX submodule)
-        uses: actions/checkout@main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 1
 
       - name: Set up Python
-        uses: actions/setup-python@main
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: '3.x'
 
       - name: Install Python dependencies
-        run: pip install numpy matplotlib
+        run: pip install -r tests/requirements.txt
 
       - name: Install ccache
         run: |
@@ -55,7 +55,7 @@ jobs:
       # is what keeps this job fast after the first run on a given submodule
       # commit (a full rebuild from scratch takes ~2 CPU-minutes x NPROC).
       - name: Cache ccache
-        uses: actions/cache@main
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
           path: ~/.ccache
           key: lid2d-ccache-${{ runner.os }}-amrex-${{ steps.amrex.outputs.sha }}
@@ -90,7 +90,7 @@ jobs:
 
       - name: Upload plots and data
         if: always()
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: lid2d-regression-results
           path: |

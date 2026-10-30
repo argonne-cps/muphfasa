@@ -1,0 +1,28 @@
+version: 2
+
+updates:
+  # Bump the SHA-pinned GitHub Actions in .github/workflows/ to each new
+  # release (workflows use full-length commit SHAs, which Dependabot can
+  # update safely).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Keep the AMReX submodule up to date with upstream (AMReX-Codes/amrex).
+  # No `branch` is set in .gitmodules, so this tracks the upstream default
+  # branch; PRs touching external/amrex trigger every regression workflow
+  # (it is in their path filters) and get a fresh ccache key, since the
+  # cache keys embed the submodule SHA.
+  - package-ecosystem: "gitsubmodule"
+    directory: "/external/amrex"
+    schedule:
+      interval: "weekly"
+
+  # Python deps for CI and the tests/regression scripts: numpy/matplotlib in
+  # tests/requirements.txt, optional yt in tests/requirements-optional.txt.
+  # Dependabot discovers every requirements*.txt in the directory.
+  - package-ecosystem: "pip"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
