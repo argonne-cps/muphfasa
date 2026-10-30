@@ -2,5 +2,5 @@
 # analysis/plotting scripts under tests/regression/.
 # Install from the repo root:  pip install -r tests/requirements.txt
 # Versions are bumped by Dependabot (see .github/dependabot.yml).
-numpy>=2.0,<3
+numpy>=2.5.4,<3
 matplotlib>=3.8,<4
