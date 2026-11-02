@@ -8,7 +8,12 @@ name: Build check (MPI+SYCL)
 # dpcpp.mak also uses icpx plus -fsycl.
 #
 # MPI is MPICH (libmpich-dev/mpich), not OpenMPI, to match Aurora at ALCF,
-# which ships Cray MPICH: AMReX's GNUMake auto-detects the wrapper
+# which ships Cray MPICH. The build step exports MPICH_CXX=icpx because
+# USE_MPI=TRUE switches compilation to the mpicxx wrapper, whose stock
+# default is g++. oneMKL is installed alongside the compiler:
+# AMReX_RandomEngine.H includes <oneapi/mkl/rng.hpp> unconditionally under
+# AMREX_USE_SYCL, and dpcpp.mak links with -qmkl=sequential. No GPU is
+# needed on the runner: SYCL compilation targets SPIR-V/host on plain CPUs.
 
 on:
   push:
@@ -54,14 +59,16 @@ jobs:
 
       # Intel oneAPI DPC++ provides icpx, the compiler AMReX's GNUMake uses
       # for both COMP=intel (intel-llvm.mak) and COMP=sycl (dpcpp.mak).
-      - name: Install Intel oneAPI DPC++ (icpx)
+      # intel-oneapi-mkl-devel ships the oneapi/mkl headers, intel-oneapi-mkl
+      # the libraries that -qmkl=sequential links against.
+      - name: Install Intel oneAPI DPC++ (icpx) and oneMKL
         run: |
           wget -qO- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
             | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
           echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
             | sudo tee /etc/apt/sources.list.d/oneAPI.list
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
+          sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mkl-devel intel-oneapi-mkl
 
       - name: Build (GNUMake, DIM=${{ matrix.dim }}, MPI+SYCL)
         # Compile only -- running the SYCL binary needs a GPU (or a CPU SYCL
@@ -76,4 +83,9 @@ jobs:
         run: |
           source /opt/intel/oneapi/setvars.sh
           export MPICH_CXX=icpx MPICH_CC=icx
+          # setvars.sh puts MKL on the search path; make the include/lib dirs
+          # explicit so <oneapi/mkl/rng.hpp> resolves regardless.
+          export MKLROOT=${MKLROOT:-/opt/intel/oneapi/mkl/latest}
+          export CPATH="$MKLROOT/include:$CPATH"
+          export LIBRARY_PATH="$MKLROOT/lib:$LIBRARY_PATH"
           make -j"$(nproc)" DIM=${{ matrix.dim }} USE_MPI=TRUE USE_SYCL=TRUE
