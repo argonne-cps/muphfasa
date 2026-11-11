@@ -34,7 +34,7 @@ Opt-in diagnostics for the analysis scripts below (default behavior is unchanged
 `lid2d.csv_prefix=<p>` writes `<p>_history.csv` (step, time, mass, ke, power, eps, umin,
 vmax, vmin) and `<p>_centerline.csv` (the two centerline profiles); `lid2d.sample_int=<n>`
 sets the sampling interval independently of `amr.plot_int`. The macroscopic fields
-(`sim->vel()`, `sim->rho()`) are not refreshed by `advanceFused`; the test calls
+(`sim->vel()`, `sim->rho()`) are not refreshed by `advance`; the test calls
 `updateMacroscopic()` before every sample after t=0 (at t=0 that call would stream the lid
 momentum in through the ghost cells, so KE(0)=0 is taken from the initial state).
 

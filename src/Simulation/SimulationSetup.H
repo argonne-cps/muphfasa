@@ -45,9 +45,7 @@ public:
 
     // Advance by one time step: 
     // Fused Kernel for streaming -> collision -> boundary conditions
-    void advanceFused(int step) override;
-    // Seperat Kernels for collision -> streaming -> boundary conditions
-    // -> macroscopic update.
+    void advance() override;
 
     // update density and velocity inbetween steps 
     void updateMacroscopic() override;
@@ -85,7 +83,6 @@ private:
     // ── Distribution function and macroscopic fields ──────────────────────
     amrex::MultiFab m_fin;     // standard distribution: LatticeTag::Q components
     amrex::MultiFab m_fout;    // output distribution in Fused: LatticeTag::Q components
-    amrex::MultiFab m_feq;  // equilibrium:  LatticeTag::Q components (scratch)
     amrex::MultiFab m_rho;  // density:      1 component
     amrex::MultiFab m_vel;  // velocity:     AMREX_SPACEDIM components
 
@@ -97,15 +94,6 @@ private:
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
 
-    // ── Per-stage wall-clock timers ───────────────────────────────────────
-    // Accumulated in advance() over the steps since the last timing report,
-    // then averaged/printed and reset in writeOutput(). mutable because
-    // writeOutput() is const but still needs to reset these after reporting.
-    mutable amrex::Real m_t_collide = amrex::Real(0.0);
-    mutable amrex::Real m_t_ghost   = amrex::Real(0.0);
-    mutable amrex::Real m_t_stream  = amrex::Real(0.0);
-    mutable amrex::Real m_t_macro   = amrex::Real(0.0);
-    mutable int         m_steps_since_report = 0;
 
     // ── Private helpers ───────────────────────────────────────────────────
     void setInitialConditions();

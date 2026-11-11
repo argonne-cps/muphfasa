@@ -81,7 +81,6 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // init multifabs
     m_fin.define  (m_ba, m_dm, LatticeTag::Q,  LatticeTag::nGhost);
     m_fout.define  (m_ba, m_dm, LatticeTag::Q,   LatticeTag::nGhost);
-    m_feq.define(m_ba, m_dm, LatticeTag::Q,  0);
     m_rho.define(m_ba, m_dm, 1,              0);
     m_vel.define(m_ba, m_dm, AMREX_SPACEDIM, 0);
 
@@ -102,9 +101,9 @@ void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 }
 
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::advanceFused(int step)
+void SimulationImpl<LatticeTag, CollisionModel>::advance()
 {
-    BL_PROFILE("SimulationImpl::advanceFused()");
+    BL_PROFILE("SimulationImpl::advance()");
 
     amrex::ignore_unused(step);
 

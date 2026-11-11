@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 
         // run simulation
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceFused(step);
+            sim->advance();
             sim->writeOutput(step);
 
             // write out analytic soln (both plt and analytic_plt are physical)

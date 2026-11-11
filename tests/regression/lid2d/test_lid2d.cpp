@@ -260,7 +260,7 @@ int main(int argc, char* argv[])
 
         std::vector<Sample> hist;
         auto sample = [&](int nsteps) {
-            // advanceFused() leaves rho/vel stale; refresh them from f before reading.
+            // advance() leaves rho/vel stale; refresh them from f before reading.
             // Not at t=0: rho/vel are exactly the rest state there, and the refresh
             // streams once, which would already inject lid momentum.
             if (nsteps > 0) { sim->updateMacroscopic(); }
@@ -281,7 +281,7 @@ int main(int argc, char* argv[])
 
         sample(0); // t=0, at rest
         for (int step = 0; step <= max_step; ++step) {
-            sim->advanceFused(step);
+            sim->advance();
             sim->writeOutput(step);
             if (step % every == 0 || step == max_step) { sample(step + 1); }
         }
