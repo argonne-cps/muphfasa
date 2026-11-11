@@ -175,7 +175,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
         writeMacroPlotfile(fname, rho_phys, vel_phys, m_geom, t_phys, step);
     }
 
-    if (step % m_params.checkpointInterval() == 0) {
+    if (m_params.checkpointInterval() > 0 && step % m_params.checkpointInterval() == 0) {
         const std::string cname = checkpointName(m_params.checkpointPrefix(), step);
         writeCheckpoint(cname, m_fin, m_geom, step, m_time);
     }
