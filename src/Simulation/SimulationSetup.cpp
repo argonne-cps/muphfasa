@@ -279,7 +279,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::buildBCManager()
 // runtime choice among D3Q15/D3Q19/D3Q27 (see SimulationFactory.cpp).
 //
 // Only BGK is instantiated for now, since TRT/MRT (Collision.H) don't yet
-// implement collide()/collideArr(). Adding a new collision model means
+// implement collide(). Adding a new collision model means
 // implementing it in Collision.cpp, then adding its instantiation lines here
 // and wiring it into SimulationFactory.cpp's collision-model dispatch.
 #if (AMREX_SPACEDIM == 2)

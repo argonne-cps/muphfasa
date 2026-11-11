@@ -69,7 +69,10 @@ struct BGK {
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real collide(const amrex::Real f,
                                const amrex::Real feq,
-                               const amrex::Real omega) noexcept;
+                               const amrex::Real omega) noexcept
+    {                           
+        return (1 - omega) * f + omega * feq;
+    }
 };   // single-relaxation-time
 struct TRT {};   // two-relaxation-time     (not yet implemented)
 struct MRT {};   // multiple-relaxation-time (not yet implemented)

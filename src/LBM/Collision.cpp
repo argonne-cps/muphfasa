@@ -13,16 +13,6 @@
 
 namespace muphfasa {
 
-
-// ── BGK::collide (single-cell kernel) ─────────────────────────────────────
-AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
-amrex::Real BGK::collide(const amrex::Real f,
-                         const amrex::Real feq,
-                         const amrex::Real omega) noexcept
-{
-    return (1 - omega) * f + omega * feq;
-}
-
 // ── pullCollideFusedArr (per-tile kernel) ──────────────────────────────────────
 // Pull (stream) then Fuses rho/u/feq into per-cell scratch (no intermediate MultiFabs).
 template <typename LatticeTag, typename CollisionModel>
