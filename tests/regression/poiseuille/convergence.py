@@ -43,8 +43,11 @@ def run_one(n: int, dim: int, tau: float, time_factor: float, lateral: int, latt
     work_dir.mkdir(parents=True, exist_ok=True)
 
     lateral_cells = " ".join([str(lateral)] * (dim - 1))
+    lateral_probHi = " ".join([str(lateral / n)] * (dim - 1))
+
     overrides = [
         f"grid.ncells={lateral_cells} {n}",
+        f"geometry.prob_hi={lateral_probHi} {1.0}",
         f"grid.max_grid_size={max(n, lateral)}",
         f"lbm.tau={tau}",
         f"sim.max_step={target_step}",
@@ -120,7 +123,7 @@ def plot_convergence(rows: list, plot_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dim", type=int, choices=(2, 3), default=2)
+    parser.add_argument("--dim", type=int, choices=(2, 3), default=2, help="problem dimension (default: 2)")
     parser.add_argument("--n-list", type=int, nargs="+", default=[16, 32, 64],
                         help="wall-normal resolutions, increasing (default: 16 32 64)")
     parser.add_argument("--lateral", type=int, default=4,
@@ -145,6 +148,7 @@ def main() -> int:
 
     solver_exe = find_one(f"test_poiseuille*{args.dim}d*.ex", POISEUILLE_DIR)
     fcompare_exe = ensure_fcompare(dim=args.dim)
+    print(fcompare_exe, "is fcompare for dim", args.dim)
 
     rows = []
     for n in sorted(args.n_list):
