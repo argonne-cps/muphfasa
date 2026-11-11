@@ -21,7 +21,7 @@ public:
     // ── Lifecycle ─────────────────────────────────────────────────────────
     virtual void initialize() = 0;
     virtual void advance() = 0;
-    virtual void updateMacroscopic() = 0;
+    virtual void updateMacroscopic(int step) = 0;
     virtual void writeOutput(int step) = 0;
 
     // ── State accessors ───────────────────────────────────────────────────

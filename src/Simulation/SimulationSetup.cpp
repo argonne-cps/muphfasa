@@ -105,9 +105,6 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance()
 {
     BL_PROFILE("SimulationImpl::advance()");
 
-    amrex::ignore_unused(step);
-
-
     // fused stream then collide
     if (m_has_forcing) {
         pullCollideFusedMF<LatticeTag, CollisionModel>(m_fin, m_fout, m_omega, m_force_lat);
@@ -126,18 +123,30 @@ void SimulationImpl<LatticeTag, CollisionModel>::advance()
 }
 
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::updateMacroscopic()
+void SimulationImpl<LatticeTag, CollisionModel>::updateMacroscopic(int step)
 {
-    // compute macroscopic NOTE: need to stream fstar_in first.
-    // This is kind of wasted computation
-    streamMF<LatticeTag>(m_fin, m_fout, m_geom);
-        
-    if (!m_has_forcing) {
-        computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
+    // only compute macro variables if they haven't been filled for
+    // this timestep
+    if (step > m_macro_update_step) {
+        // compute macroscopic NOTE: need to stream fstar_in first.
+        // This is kind of wasted computation
+        streamMF<LatticeTag>(m_fin, m_fout, m_geom);
+
+        if (!m_has_forcing) {
+            computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
+        }
+        else {
+            computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel, m_force_lat);
+        }
+
+        m_macro_update_step = step;
     }
+#ifdef AMREX_DEBUG
     else {
-        computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel, m_force_lat);
+        amrex::Print() << "Macroscpic Values have already been updated for this timestep: " << step << std::endl;
     }
+#endif
+
 }
 
 template <typename LatticeTag, typename CollisionModel>
@@ -147,7 +156,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
 
     if (m_params.plotInterval() > 0 && step % m_params.plotInterval() == 0) {
 
-        updateMacroscopic();
+        updateMacroscopic(step);
 
         const std::string fname = plotfileName(m_params.plotfilePrefix(), step);
         // Plotfiles are written in physical (SI) units; solver state stays lattice.

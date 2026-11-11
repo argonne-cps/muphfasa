@@ -183,7 +183,7 @@ int main(int argc, char* argv[])
 
         // calc final error if no writes
         if (params.plotInterval() < 0 ){
-                sim->updateMacroscopic();
+                sim->updateMacroscopic(max_step);
                 calcError(sim, max_err, analytic_file, H, U0, nu, max_step);
         }
 

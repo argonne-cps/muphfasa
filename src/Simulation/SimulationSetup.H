@@ -48,7 +48,7 @@ public:
     void advance() override;
 
     // update density and velocity inbetween steps 
-    void updateMacroscopic() override;
+    void updateMacroscopic(int step) override;
     // Write plotfile and/or checkpoint when the output intervals are hit.
     void writeOutput(int step) override;
 
@@ -94,6 +94,8 @@ private:
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
 
+    // ── Step of last macro update ─────────────────────────────────────────
+    int m_macro_update_step = -1;
 
     // ── Private helpers ───────────────────────────────────────────────────
     void setInitialConditions();

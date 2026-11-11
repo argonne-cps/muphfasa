@@ -263,7 +263,7 @@ int main(int argc, char* argv[])
             // advance() leaves rho/vel stale; refresh them from f before reading.
             // Not at t=0: rho/vel are exactly the rest state there, and the refresh
             // streams once, which would already inject lid momentum.
-            if (nsteps > 0) { sim->updateMacroscopic(); }
+            if (nsteps > 0) { sim->updateMacroscopic(nsteps); }
             Sample s;
             s.step = nsteps;
             s.time = sim->time();
