@@ -25,7 +25,6 @@ public:
     // ── Grid ─────────────────────────────────────────────────────────────
     std::vector<int> ncells()       const;  // cells per direction
     int                              maxGridSize()  const;
-    int                              nGhost()       const;  // ghost-cell layers
 
     // ── Time stepping ─────────────────────────────────────────────────────
     int         maxStep()      const;
@@ -47,7 +46,6 @@ public:
 
     // ── Physical / unit parameters ────────────────────────────────────────
     amrex::Real reynoldsNumber() const;
-    amrex::Real machNumber()     const;
     amrex::Real refLength()      const;   // [m]
     amrex::Real refVelocity()    const;   // [m/s]
     amrex::Real refDensity()     const;   // [kg/m^3]

@@ -89,14 +89,6 @@ int InputParser::maxGridSize() const
     return val;
 }
 
-int InputParser::nGhost() const
-{
-    amrex::ParmParse pp("grid");
-    int val = 1;
-    pp.query("n_ghost", val);
-    return val;
-}
-
 int InputParser::maxStep() const
 {
     amrex::ParmParse pp("sim");
@@ -150,14 +142,6 @@ amrex::Real InputParser::reynoldsNumber() const
     amrex::ParmParse pp("units");
     amrex::Real val = amrex::Real(0.0);
     pp.query("Re", val);
-    return val;
-}
-
-amrex::Real InputParser::machNumber() const
-{
-    amrex::ParmParse pp("units");
-    amrex::Real val = amrex::Real(0.0);
-    pp.query("Ma", val);
     return val;
 }
 
