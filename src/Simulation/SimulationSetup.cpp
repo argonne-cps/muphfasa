@@ -127,48 +127,6 @@ void SimulationImpl<LatticeTag, CollisionModel>::advanceFused(int step)
 }
 
 template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::advanceSep(int step)
-{
-    BL_PROFILE("SimulationImpl::advance()");
-
-    amrex::ignore_unused(step);
-
-    // collide
-    amrex::Real t0 = amrex::second();
-    computeEquilibriumMF<LatticeTag>(m_rho, m_vel, m_feq);
-    if (m_has_forcing) {
-        collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_vel, m_omega, m_force_lat);
-    } else {
-        collideMF<LatticeTag, CollisionModel>(m_fin, m_feq, m_omega);
-    }
-    amrex::Real t1 = amrex::second();
-    m_t_collide += t1 - t0;
-
-    // fill ghost and stream
-    fillGhostCells();
-    amrex::Real t2 = amrex::second();
-    m_t_ghost += t2 - t1;
-
-    streamInPlace<LatticeTag>(m_fin, m_geom);
-    amrex::Real t3 = amrex::second();
-    m_t_stream += t3 - t2;
-
-    // compute macro
-    if (m_has_forcing) {
-        computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel, m_force_lat);
-    } else {
-        computeMacroscopic<LatticeTag>(m_fin, m_rho, m_vel);
-    }
-    amrex::Real t4 = amrex::second();
-    m_t_macro += t4 - t3;
-
-    ++m_steps_since_report;
-
-    m_time += amrex::Real(1.0);
-}
-
-
-template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::updateMacroscopic()
 {
     // compute macroscopic NOTE: need to stream fstar_in first.
@@ -207,43 +165,12 @@ void SimulationImpl<LatticeTag, CollisionModel>::writeOutput(int step)
 
         // writeout
         writeMacroPlotfile(fname, rho_phys, vel_phys, m_geom, t_phys, step);
-        reportStageTiming(step);
     }
 
     if (step % m_params.checkpointInterval() == 0) {
         const std::string cname = checkpointName(m_params.checkpointPrefix(), step);
         writeCheckpoint(cname, m_fin, m_geom, step, m_time);
     }
-}
-
-template <typename LatticeTag, typename CollisionModel>
-void SimulationImpl<LatticeTag, CollisionModel>::reportStageTiming(int step) const
-{
-    // Report average per-step stage timing since the last report, then
-    // reset so the next report covers only the steps since this one.
-    if (m_steps_since_report == 0) { return; }
-
-    amrex::Real t_collide = m_t_collide;
-    amrex::Real t_ghost   = m_t_ghost;
-    amrex::Real t_stream  = m_t_stream;
-    amrex::Real t_macro   = m_t_macro;
-    amrex::ParallelDescriptor::ReduceRealMax({t_collide, t_ghost, t_stream, t_macro});
-
-    const amrex::Real n = amrex::Real(m_steps_since_report);
-    amrex::Print() << "[step " << step << "] avg stage time over "
-                    << m_steps_since_report << " step(s): "
-                    << "collide=" << (t_collide / n) * 1e3 << " ms, "
-                    << "ghost=" << (t_ghost / n) * 1e3 << " ms, "
-                    << "stream=" << (t_stream / n) * 1e3 << " ms, "
-                    << "macro=" << (t_macro / n) * 1e3 << " ms, "
-                    << "total=" << ((t_collide + t_ghost + t_stream + t_macro) / n) * 1e3
-                    << " ms\n";
-
-    m_t_collide = amrex::Real(0.0);
-    m_t_ghost   = amrex::Real(0.0);
-    m_t_stream  = amrex::Real(0.0);
-    m_t_macro   = amrex::Real(0.0);
-    m_steps_since_report = 0;
 }
 
 template <typename LatticeTag, typename CollisionModel>

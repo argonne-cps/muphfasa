@@ -48,7 +48,6 @@ public:
     void advanceFused(int step) override;
     // Seperat Kernels for collision -> streaming -> boundary conditions
     // -> macroscopic update.
-    void advanceSep(int step) override;
 
     // update density and velocity inbetween steps 
     void updateMacroscopic() override;
