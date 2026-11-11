@@ -15,9 +15,9 @@ sim.stop_time    = -1.0
 lbm.lattice_type = D3Q19
 lbm.tau          = 0.8
 
-units.ref_length    = 1.0
+units.ref_length    = 0.5
 units.ref_velocity  = 1.0
-units.Re            = 32.0
+units.Re            = 16.0
 units.ref_density   = 1.0
 
 forcing.accel = 5.4  0.0  0.0

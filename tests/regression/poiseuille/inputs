@@ -22,9 +22,9 @@ lbm.lattice_type = D2Q9
 # ── Physical units ─────────────────────────────────────────────────────────
 # N_ref = 32, default lattice velocity 0.1 -> dx = 1/32, dt = 0.1/32,
 # nu_lat = 0.1, tau = 0.8.
-units.ref_length    = 1.0
+units.ref_length    = 0.5
 units.ref_velocity  = 1.0
-units.Re            = 32.0   # implies nu = 1/32
+units.Re            = 16.0   # implies nu = 1/32
 
 # ── Body force ─────────────────────────────────────────────────────────────
 # Physical acceleration [m/s^2]: F_lat = 3.9e-5, U_max = a H^2/(8 nu) = 0.5 m/s
