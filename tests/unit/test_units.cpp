@@ -29,17 +29,15 @@ int main(int argc, char* argv[])
     {
         amrex::Print() << "\n=== Unit converter tests ===\n";
 
-        // TODO: construct a UnitConverter with known inputs and verify:
-        //   - toLatticeLength(refLength()) returns N_ref
-        //   - relaxationTime() > 0.5   (stability requirement)
-        //   - machNumber() < 0.1       (low-Ma assumption)
-
         // Body-force acceleration: a_lat = a_phys * dt^2 / dx. Hand-computed:
         // L=1, U=1, Re=32, N=32 -> dx = 1/32 and dt = dx * u_lat/U = dx * u_lat,
         // so for any u_lat, a_lat = a_phys * dx * u_lat^2.
         {
             const amrex::Real cs2 = amrex::Real(1.0) / amrex::Real(3.0);
-            const muphfasa::UnitConverter units(1.0, 1.0, 32.0, 1.0, 32, cs2);
+            std::vector<int> N{AMREX_D_DECL(32, 32, 32)};
+            std::vector<amrex::Real> lo{AMREX_D_DECL(0, 0, 0)};
+            std::vector<amrex::Real> hi{AMREX_D_DECL(1, 1, 1)};
+            const muphfasa::UnitConverter units(1.0, 1.0, 1.0, N, lo, hi, cs2, 32.0);
             const amrex::Real dx = units.dx();
             const amrex::Real dt = units.dt();
             assertClose(dx, amrex::Real(1.0) / amrex::Real(32.0), 1e-15, "dx");
