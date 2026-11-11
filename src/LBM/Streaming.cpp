@@ -13,7 +13,7 @@ namespace muphfasa {
 
 
 template <typename LatticeTag>
-void default_stream(const amrex::Box& box,
+void streamArr(const amrex::Box& box,
                     amrex::Array4<const amrex::Real> const& f_in_arr,
                     amrex::Array4<amrex::Real> const& f_out_arr) {
 
@@ -26,7 +26,7 @@ void default_stream(const amrex::Box& box,
 
 // ── Two-MultiFab streaming ────────────────────────────────────────────────
 template <typename LatticeTag>
-void stream(const amrex::MultiFab& f_in,
+void streamMF(const amrex::MultiFab& f_in,
             amrex::MultiFab&       f_out,
             const amrex::Geometry& geom)
 {
@@ -41,24 +41,8 @@ void stream(const amrex::MultiFab& f_in,
         amrex::Array4<amrex::Real> const& fo_arr = f_out[mfi].array();
         amrex::Array4<amrex::Real const> const& fi_arr = f_in[mfi].const_array();
 
-        default_stream<LatticeTag>(tileBox, fi_arr, fo_arr);
+        streamArr<LatticeTag>(tileBox, fi_arr, fo_arr);
     }
-
-    // sync for profiling
-    amrex::Gpu::streamSynchronize();
-}
-
-// ── In-place streaming (using scratch space) ──────────────────────────────
-template <typename LatticeTag>
-void streamInPlace(amrex::MultiFab&       f,
-                   const amrex::Geometry& geom)
-{
-    BL_PROFILE("streamInPlace()");
-
-    amrex::MultiFab f_scratch(f.boxArray(), f.DistributionMap(),
-                               f.nComp(), f.nGrow());
-    stream<LatticeTag>(f, f_scratch, geom);
-    amrex::MultiFab::Copy(f, f_scratch, 0, 0, f.nComp(), 0);
 
     // sync for profiling
     amrex::Gpu::streamSynchronize();
@@ -88,14 +72,6 @@ template void stream<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, const amrex
 template void stream<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 template void stream<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 template void stream<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
-#endif
-
-#if (AMREX_SPACEDIM == 2)
-template void streamInPlace<D2Q9>(amrex::MultiFab&, const amrex::Geometry&);
-#else
-template void streamInPlace<D3Q15>(amrex::MultiFab&, const amrex::Geometry&);
-template void streamInPlace<D3Q19>(amrex::MultiFab&, const amrex::Geometry&);
-template void streamInPlace<D3Q27>(amrex::MultiFab&, const amrex::Geometry&);
 #endif
 
 } // namespace muphfasa

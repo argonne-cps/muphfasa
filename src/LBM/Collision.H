@@ -66,23 +66,6 @@ amrex::Real guoForceTerm(int n,
 
 // ── Collision model tag types ─────────────────────────────────────────────
 struct BGK {
-    template <typename LatticeTag>
-    static void collideArr(const amrex::Box& box,
-                           amrex::Array4<amrex::Real> const& f_arr,
-                           amrex::Array4<const amrex::Real> const& feq_arr,
-                           const amrex::Real omega);
-
-    // Forced variant: relaxation plus the Guo term, using the (half-force
-    // corrected) velocity in vel_arr. A separate overload so the force-free
-    // kernel above does no extra reads or arithmetic.
-    template <typename LatticeTag>
-    static void collideArr(const amrex::Box& box,
-                           amrex::Array4<amrex::Real> const& f_arr,
-                           amrex::Array4<const amrex::Real> const& feq_arr,
-                           amrex::Array4<const amrex::Real> const& vel_arr,
-                           const amrex::Real omega,
-                           amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
-
     AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
     static amrex::Real collide(const amrex::Real f,
                                const amrex::Real feq,
@@ -91,40 +74,7 @@ struct BGK {
 struct TRT {};   // two-relaxation-time     (not yet implemented)
 struct MRT {};   // multiple-relaxation-time (not yet implemented)
 
-// ── MultiFab-level collision (host-side) ─────────────────────────────────
-
-// Apply the collision operator in-place to f_mf given feq_mf and tau.
-// Dispatches on CollisionModel tag (currently only BGK is active).
-template <typename LatticeTag, typename CollisionModel>
-void collideMF(amrex::MultiFab&       f_mf,
-               const amrex::MultiFab& feq_mf,
-               amrex::Real            omega);
-
-// Forced variant (body force F, lattice units): vel_mf is the half-force
-// corrected velocity from computeMacroscopic(..., F).
-template <typename LatticeTag, typename CollisionModel>
-void collideMF(amrex::MultiFab&       f_mf,
-               const amrex::MultiFab& feq_mf,
-               const amrex::MultiFab& vel_mf,
-               amrex::Real            omega,
-               amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
-
-// Per-tile kernel: computes rho, u, and f^eq per cell and immediately
-// relaxes f toward it into fstar_arr. rho/u/feq are local per-cell scratch,
-// not written out to MultiFabs, since nothing downstream of this fused
-// kernel needs them.
-template <typename LatticeTag, typename CollisionModel>
-void collideFullArr(const amrex::Box& box,
-                    amrex::Array4<amrex::Real> const& fstar_arr,
-                    amrex::Array4<const amrex::Real> const& f_arr,
-                    amrex::Real omega);
-
-// Full collision step: fused rho/u/feq/fstar computation in one MFIter pass.
-template <typename LatticeTag, typename CollisionModel>
-void collideFullMF(amrex::MultiFab&       fstar_mf,
-                   const amrex::MultiFab& f_mf,
-                   amrex::Real            omega);
-
+// ── Array-level collision (host-side) ─────────────────────────────────
 // Per-tile kernel fused stream/collide: pulls (streams)
 // then computes rho, u, and f^eq per cell and immediately
 // relaxes f toward it into fstar_out_arr. rho/u/feq are local per-cell scratch,
@@ -145,6 +95,7 @@ void pullCollideFusedArr(const amrex::Box& box,
                     amrex::Real omega,
                     amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
 
+// ── MultiFab-level collision (host-side) ─────────────────────────────────
 // Full stream/collision step: Pulls from f then collides
 // w/ fused rho/u/feq/fstar computation in one MFIter pass.
 template <typename LatticeTag, typename CollisionModel>
@@ -158,7 +109,6 @@ void pullCollideFusedMF(const amrex::MultiFab& fin_mf,
                        amrex::MultiFab& fout_mf,
                        amrex::Real omega,
                        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F);
-
 
 } // namespace muphfasa
 

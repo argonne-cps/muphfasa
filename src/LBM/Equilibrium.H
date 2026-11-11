@@ -56,22 +56,6 @@ amrex::Real computeEquilibriumCell3D(const amrex::Real rho,
               - 0.5 * LatticeTag::cs2inv * u_sq);
 }
 
-// ── array-level kernel ─────────────────────────────────────────────────
-// Fills feq_arr for all velocity directions given rho and u arrays.
-template <typename LatticeTag>
-void computeEquilibrium(const amrex::Box& box,
-                               amrex::Array4<amrex::Real const> const& rho,
-                               amrex::Array4<amrex::Real const> const& vel,
-                               amrex::Array4<amrex::Real> const& feq_arr);
-
-
-// ── MultiFab-level helpers (host-side) ───────────────────────────────────
-// Fills feq_mf (Q components) over all valid cells using rho_mf and vel_mf.
-template <typename LatticeTag>
-void computeEquilibriumMF(const amrex::MultiFab& rho_mf,
-                           const amrex::MultiFab& vel_mf,
-                           amrex::MultiFab&       feq_mf);
-
 } // namespace muphfasa
 
 #endif // MUPHFASA_EQUILIBRIUM_H
