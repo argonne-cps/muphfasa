@@ -78,7 +78,7 @@ jobs:
         # some noise at the finest resolution); --min-order leaves margin for
         # compiler/platform noise while still catching a real regression
         # (e.g. a dropped-to-1st-order collision/streaming bug).
-        run: python3 convergence.py --n-list 16 32 64 --min-order 1.8
+        run: python3 convergence.py --n-list 32 64 128 --min-order 1.8
 
       - name: Upload plots and data
         if: always()
