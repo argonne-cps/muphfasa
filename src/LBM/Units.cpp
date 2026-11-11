@@ -25,20 +25,21 @@ constexpr amrex::Real kConsistencyTol = amrex::Real(1.0e-12);
 }
 
 UnitConverter::UnitConverter(amrex::Real L_ref,
-                              amrex::Real U_ref,
-                              amrex::Real Re,
-                              amrex::Real rho_ref,
-                              int         N_ref,
-                              amrex::Real cs2,
-                              std::optional<amrex::Real> u_lat,
-                              std::optional<amrex::Real> tau)
-    : m_L_ref(L_ref), m_U_ref(U_ref), m_Re(Re), m_rho_ref(rho_ref), m_cs2(cs2)
+                             amrex::Real U_ref,
+                             amrex::Real rho_ref,
+                             std::vector<int> N,
+                             std::vector<amrex::Real> domLo,
+                             std::vector<amrex::Real> domHi,
+                             amrex::Real cs2,
+                             std::optional<amrex::Real> Re,
+                             std::optional<amrex::Real> nu_phys,
+                             std::optional<amrex::Real> u_lat,
+                             std::optional<amrex::Real> tau)
+    : m_L_ref(L_ref), m_U_ref(U_ref),  m_rho_ref(rho_ref), m_cs2(cs2)
 {
-    // set length conversion
-    m_dx = m_L_ref / amrex::Real(N_ref);
+    // calc domain resolution
+    setGridResolution(N, domLo, domHi);
 
-    // set nu ref
-    m_nu_ref = m_U_ref * m_L_ref / m_Re;
     // set nu_phys/Re by inputs. check only one specified
     if (nu_phys) {
         m_nu_phys = *nu_phys;
@@ -109,17 +110,17 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
                 "u_lat does not satisfy low Mach number limit"
                 "Alter lbm.u_lat to fix.");
 
-
     
     // Print Unit settings
     amrex::Print() << "Physical Inputs:" << std::endl
                    << "Re: " << reynoldsNumber() << std::endl 
                    << "U_phys: " << m_U_ref << std::endl
                    << "L_phys: " << m_L_ref << std::endl
-                   << "nu_phys: " << m_nu_ref << std::endl
-                   << "Ngrid: " << N_ref << std::endl
+                   << "nu_phys: " << m_nu_phys << std::endl
+                   << "L_domain: " << m_L_dom << std::endl
     
                    << "Starting Simulation with Lattice Units:" << std::endl
+                   << "Ngrid: " << m_N_grid << std::endl
                    << "U_lat: " << m_u_lat << std::endl
                    << "L_lat: " << toLatticeLength(m_L_ref) << std::endl
                    << "nu_lat: " << m_nu_lat << std::endl
@@ -127,6 +128,44 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
                    << "Ma: " << machNumber() << std::endl
                    << "C_x: " << dx() << std::endl
                    << "C_t: " << dt() << std::endl;
+}
+
+void UnitConverter::setGridResolution(std::vector<int> Ncells,
+                             std::vector<amrex::Real> probLo,
+                             std::vector<amrex::Real> probHi) {
+
+    // get Ncells in largest direction
+    int max_N = Ncells[0];
+    for (auto n : Ncells) { max_N = (n > max_N) ? n : max_N; }
+
+    // get domain length
+    std::vector<amrex::Real> domLength{AMREX_D_DECL(0., 0., 0.)};
+    std::vector<amrex::Real> gridRes{AMREX_D_DECL(0., 0., 0.)};
+    amrex::Real max_L = -1;
+    for (int i=0; i < AMREX_SPACEDIM; ++i){
+        domLength[i] = probHi[i] - probLo[i];
+        max_L = (domLength[i] > max_L) ? domLength[i] : max_L;
+
+        gridRes[i] = domLength[i] / amrex::Real(Ncells[i]);
+    }
+
+    // check lattice is square
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::abs(gridRes[0] - gridRes[1]) < 1e-12,
+                                "Lattice must be sqaure (Lx/Nx == Ly/Ny)");
+#if (AMREX_SPACEDIM == 3)
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::abs(gridRes[0] - gridRes[2]) < 1e-12,
+                                "Lattice must be sqaure (Lx/Nx == Lz/Nz)");
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
+            std::abs(gridRes[1] - gridRes[2]) < 1e-12,
+                                "Lattice must be sqaure (Ly/Ny == Lz/Nz)");
+#endif
+
+    // set values
+    m_L_dom = max_L;
+    m_N_grid = max_N;
+    m_dx = max_L/amrex::Real(max_N);
 }
 
 amrex::Real UnitConverter::toLatticeLength   (amrex::Real x_phys)   const noexcept { return x_phys / m_dx; }

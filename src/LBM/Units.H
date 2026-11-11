@@ -20,11 +20,15 @@ public:
     // Construct from physical reference quantities.
     // L_ref  [m]       : reference length (e.g. channel half-width)
     // U_ref  [m/s]     : reference velocity
-    // Re               : Reynolds number (dimensionless scale invariant)
-    // nu_ref [m^2/s]   : kinematic viscosity
     // rho_ref [kg/m^3] : reference density
-    // N_ref            : number of lattice cells spanning L_ref (resolution)
+    // N                : number of lattice cells spanning L_dom (resolution)
+    // L_dom  [m]       : length of domain
     // cs2              : lattice sound speed squared (LatticeTag::cs2).
+    //
+    // nuphys is either set by the user or determined by using the 
+    // Re number as set by the user. nu_phys take priority and user is warned.
+    //      Re               : Reynolds number (dimensionless scale invariant)
+    //      nu_phys [m^2/s]  : kinematic viscosity
     //
     // dt is pinned by exactly one of two user choices:
     //   u_lat : the dimensionless lattice reference velocity directly.
@@ -35,7 +39,9 @@ public:
     UnitConverter(amrex::Real L_ref,
                   amrex::Real U_ref,
                   amrex::Real rho_ref,
-                  int         N_ref,
+                  std::vector<int> N,
+                  std::vector<amrex::Real> domLo,
+                  std::vector<amrex::Real> domHi,
                   amrex::Real cs2,
                   std::optional<amrex::Real> Re = std::nullopt,
                   std::optional<amrex::Real> nu_phys = std::nullopt,
@@ -75,12 +81,18 @@ public:
     amrex::Real dt() const noexcept { return m_dt; }  // time step       [s]
 
 private:
-    amrex::Real m_L_ref, m_U_ref, m_Re, m_nu_ref, m_rho_ref;
+    amrex::Real m_L_ref, m_U_ref, m_Re, m_nu_phys, m_rho_ref;
+    amrex::Real m_L_dom, m_N_grid;
     amrex::Real m_cs2;
     amrex::Real m_dx, m_dt;
     amrex::Real m_u_lat;   // lattice reference velocity (Ma * cs)
     amrex::Real m_nu_lat;  // lattice kinematic viscosity
     amrex::Real m_tau;  // relaxation time
+
+    void setGridResolution(std::vector<int> Ncells,
+                           std::vector<amrex::Real> probLo,
+                           std::vector<amrex::Real> probHi);
+
 };
 
 } // namespace muphfasa

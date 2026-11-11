@@ -33,10 +33,6 @@ template <typename LatticeTag, typename CollisionModel>
 SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& params)
     : m_params(params)
 {
-    // get Ncells in largest direction
-    auto Ncells = params.ncells();
-    int max_N = Ncells[0];
-    for (auto n : Ncells) { max_N = (n > max_N) ? n : max_N; }
 
     // Set phys/lattice units. lbm.u_lat / lbm.tau (both optional) let the
     // user pin the lattice spacing directly; UnitConverter checks they're
@@ -44,10 +40,13 @@ SimulationImpl<LatticeTag, CollisionModel>::SimulationImpl(const InputParser& pa
     // given, and falls back to its own default u_lat if neither is.
     m_units = std::make_unique<UnitConverter>(params.refLength(),
                                               params.refVelocity(),
-                                              params.reynoldsNumber(),
                                               params.refDensity(),
-                                              max_N,
+                                              params.ncells(),
+                                              params.geometryProbLo(),
+                                              params.geometryProbHi(),
                                               LatticeTag::cs2,
+                                              params.reynoldsNumber(),
+                                              params.physViscosity(),
                                               params.latticeVelocity(),
                                               params.relaxationTime());
 
