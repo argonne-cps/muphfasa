@@ -105,11 +105,13 @@ static void setupClosedBoxInputs(const std::vector<int>& ncells,
         pp.addarr("lo_type", lo);
         pp.addarr("hi_type", hi);
     }
-    // Geometry: unit cube / square.
+    // Geometry: rectangle/box matching ncells .
     {
         amrex::ParmParse pp("geometry");
         std::vector<amrex::Real> prob_lo(AMREX_SPACEDIM, 0.0);
         std::vector<amrex::Real> prob_hi(AMREX_SPACEDIM, 1.0);
+        for (int i=0; i < AMREX_SPACEDIM; ++i) {prob_hi[i] = amrex::Real(ncells[i]);}
+
         pp.addarr("prob_lo", prob_lo);
         pp.addarr("prob_hi", prob_hi);
         pp.add("type", std::string("box"));
