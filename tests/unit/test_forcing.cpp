@@ -26,6 +26,41 @@ using namespace muphfasa;
 
 namespace {
 
+// helper collide functions that takes two arrays
+// one of the populations, f, and the equilib. populations, f_eq,
+// and performs BGK collision using the relaxation frequency omega
+// Forced variant as well
+template <typename LatticeTag>
+void collideArr(const amrex::Box& box,
+                amrex::Array4<amrex::Real> const& f_arr,
+                amrex::Array4<const amrex::Real> const& feq_arr,
+                const amrex::Real omega) 
+{
+    amrex::ParallelFor(box, LatticeTag::Q,
+                [=] AMREX_GPU_DEVICE(int i, int j, int k, int n) {
+        f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega);
+    });
+}
+
+template <typename LatticeTag>
+void collideArr(const amrex::Box& box,
+                amrex::Array4<amrex::Real> const& f_arr,
+                amrex::Array4<const amrex::Real> const& feq_arr,
+                amrex::Array4<const amrex::Real> const& vel_arr,
+                const amrex::Real omega,
+                amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> const& F)
+{
+    // F is captured by value (GpuArray is device-copyable).
+    amrex::ParallelFor(box, [=] AMREX_GPU_DEVICE(int i, int j, int k) {
+        amrex::GpuArray<amrex::Real, AMREX_SPACEDIM> u{};
+        for (int d = 0; d < AMREX_SPACEDIM; ++d) { u[d] = vel_arr(i, j, k, d); }
+        for (int n = 0; n < LatticeTag::Q; ++n) {
+            f_arr(i, j, k, n) = BGK::collide(f_arr(i, j, k, n), feq_arr(i, j, k, n), omega)
+                              + guoForceTerm<LatticeTag>(n, u, F, omega);
+        }
+    });
+}
+
 using Vec = amrex::GpuArray<amrex::Real, AMREX_SPACEDIM>;
 
 int g_failures = 0;
@@ -149,7 +184,7 @@ void testLattice(const char* name, std::mt19937& rng)
         // ── 3. Single-step momentum / mass ────────────────────────────────
         auto feq = feq_fab.array();
         for (int n = 0; n < LatticeTag::Q; ++n) { feq(0, 0, 0, n) = feqCell<LatticeTag>(rho, uc, n); }
-        BGK::collideArr<LatticeTag>(bx, f, feq_fab.const_array(), vel_fab.const_array(), omega, F);
+        collideArr<LatticeTag>(bx, f, feq_fab.const_array(), vel_fab.const_array(), omega, F);
 
         double mass = 0;
         double J[D] = {};
@@ -190,8 +225,8 @@ void testLattice(const char* name, std::mt19937& rng)
         amrex::FArrayBox feq2(bx, LatticeTag::Q);
         auto fe = feq2.array();
         for (int n = 0; n < LatticeTag::Q; ++n) { fe(0, 0, 0, n) = feqCell<LatticeTag>(r, u0, n); }
-        BGK::collideArr<LatticeTag>(bx, a, feq2.const_array(), omega);
-        BGK::collideArr<LatticeTag>(bx, b, feq2.const_array(), v_plain.const_array(), omega, zero);
+        collideArr<LatticeTag>(bx, a, feq2.const_array(), omega);
+        collideArr<LatticeTag>(bx, b, feq2.const_array(), v_plain.const_array(), omega, zero);
         for (int n = 0; n < LatticeTag::Q; ++n) {
             check(a(0, 0, 0, n) == b(0, 0, 0, n), name, "F=0 collide bit-identical", 0);
         }
