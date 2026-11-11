@@ -59,19 +59,19 @@ template amrex::Real streamCell<D3Q27>(amrex::Array4<const amrex::Real> const&, 
 #endif
 
 #if (AMREX_SPACEDIM == 2)
-template void default_stream<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void streamArr<D2Q9>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 #else
-template void default_stream<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
-template void default_stream<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
-template void default_stream<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void streamArr<D3Q15>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void streamArr<D3Q19>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
+template void streamArr<D3Q27>(const amrex::Box&, amrex::Array4<const amrex::Real> const&, amrex::Array4<amrex::Real> const&);
 #endif
 
 #if (AMREX_SPACEDIM == 2)
-template void stream<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+template void streamMF<D2Q9>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 #else
-template void stream<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
-template void stream<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
-template void stream<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+template void streamMF<D3Q15>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+template void streamMF<D3Q19>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
+template void streamMF<D3Q27>(const amrex::MultiFab&, amrex::MultiFab&, const amrex::Geometry&);
 #endif
 
 } // namespace muphfasa

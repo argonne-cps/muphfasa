@@ -131,7 +131,7 @@ void SimulationImpl<LatticeTag, CollisionModel>::updateMacroscopic()
 {
     // compute macroscopic NOTE: need to stream fstar_in first.
     // This is kind of wasted computation
-    stream<LatticeTag>(m_fin, m_fout, m_geom);
+    streamMF<LatticeTag>(m_fin, m_fout, m_geom);
         
     if (!m_has_forcing) {
         computeMacroscopic<LatticeTag>(m_fout, m_rho, m_vel);
