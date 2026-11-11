@@ -34,10 +34,11 @@ public:
     //
     UnitConverter(amrex::Real L_ref,
                   amrex::Real U_ref,
-                  amrex::Real Re,
                   amrex::Real rho_ref,
                   int         N_ref,
                   amrex::Real cs2,
+                  std::optional<amrex::Real> Re = std::nullopt,
+                  std::optional<amrex::Real> nu_phys = std::nullopt,
                   std::optional<amrex::Real> u_lat = std::nullopt,
                   std::optional<amrex::Real> tau   = std::nullopt);
 

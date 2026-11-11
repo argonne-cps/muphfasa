@@ -39,13 +39,33 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
 
     // set nu ref
     m_nu_ref = m_U_ref * m_L_ref / m_Re;
+    // set nu_phys/Re by inputs. check only one specified
+    if (nu_phys) {
+        m_nu_phys = *nu_phys;
+        m_Re = m_U_ref * m_L_ref / m_nu_phys;
+        
+        if (Re) {
+                AMREX_ALWAYS_ASSERT_WITH_MESSAGE(false,
+                  "UnitConverter: Both units.Re and units.nu_phys were specified."
+                  "specify only one and let the other be derived.");
+        }
+    }
+    else if (Re) {
+        m_Re = *Re;
+        m_nu_phys = m_U_ref * m_L_ref / m_Re;
+    }
+    else {
+            AMREX_ALWAYS_ASSERT_WITH_MESSAGE(false,
+                "UnitConverter: Neither units.Re nor units.nu_phys were specified."
+                "specify one to determine physical kinetamic viscosity.");
+    }
 
     // Define lattice velocity from inputs or default
     if (tau) {
         // Solve for the u_lat implied by the requested relaxation time:
         // nu_lat = (tau-0.5)*cs2, and nu_lat = nu_ref*u_lat/(U_ref*dx).
         const amrex::Real nu_lat_from_tau = (*tau - amrex::Real(0.5)) * cs2;
-        const amrex::Real u_lat_from_tau  = nu_lat_from_tau * m_U_ref * m_dx / m_nu_ref;
+        const amrex::Real u_lat_from_tau  = nu_lat_from_tau * m_U_ref * m_dx / m_nu_phys;
 
         if (u_lat) {
             AMREX_ALWAYS_ASSERT_WITH_MESSAGE(false,
@@ -63,7 +83,7 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
     m_dt     = m_u_lat * m_dx / m_U_ref;
 
     // set lattice viscosity
-    m_nu_lat = m_nu_ref * m_dt / (m_dx * m_dx);
+    m_nu_lat = m_nu_phys * m_dt / (m_dx * m_dx);
 
     // set tau
     m_tau = 0.5 + m_nu_lat / m_cs2;
