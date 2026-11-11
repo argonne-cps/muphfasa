@@ -137,12 +137,12 @@ std::optional<amrex::Real> InputParser::latticeVelocity() const
     return std::nullopt;
 }
 
-amrex::Real InputParser::reynoldsNumber() const
+std::optional<amrex::Real> InputParser::reynoldsNumber() const
 {
     amrex::ParmParse pp("units");
-    amrex::Real val = amrex::Real(0.0);
-    pp.query("Re", val);
-    return val;
+    amrex::Real val{};
+    if (pp.query("Re", val)) { return val; }
+    return std::nullopt;
 }
 
 amrex::Real InputParser::refLength() const
@@ -161,6 +161,13 @@ amrex::Real InputParser::refVelocity() const
     return val;
 }
 
+std::optional<amrex::Real> InputParser::physViscosity() const
+{
+    amrex::ParmParse pp("units");
+    amrex::Real val{};
+    if (pp.query("nu_phys", val)) { return val; }
+    return std::nullopt;
+}
 
 amrex::Real InputParser::refDensity() const
 {

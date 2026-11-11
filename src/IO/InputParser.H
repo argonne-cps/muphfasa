@@ -45,7 +45,8 @@ public:
     std::optional<amrex::Real> latticeVelocity() const; // lbm.u_lat
 
     // ── Physical / unit parameters ────────────────────────────────────────
-    amrex::Real reynoldsNumber() const;
+    std::optional<amrex::Real> reynoldsNumber() const;
+    std::optional<amrex::Real> physViscosity()   const;   // [m^2/s]
     amrex::Real refLength()      const;   // [m]
     amrex::Real refVelocity()    const;   // [m/s]
     amrex::Real refDensity()     const;   // [kg/m^3]
