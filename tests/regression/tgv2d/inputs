@@ -26,9 +26,9 @@ lbm.tau          = 0.8      # pinned directly: nu_lat = (tau-0.5)*cs2 = 0.1
 # see src/LBM/Units.cpp. units.ref_velocity doubles as the TGV vortex
 # amplitude u0 (read via InputParser::refVelocity() by both InitData.cpp and
 # test_tgv2d.cpp), in lattice units.
-units.ref_length    = 64.0
-units.ref_velocity  = 0.002
-units.Re            = 1.0
+units.ref_length    = 1.0
+units.ref_velocity  = 0.005
+units.Re            = 10
 
 # ── Boundary conditions ────────────────────────────────────────────────────
 # Fully periodic; GeometryHandler derives is_periodic from these names.
@@ -36,8 +36,9 @@ bc.lo_type = Periodic  Periodic
 bc.hi_type = Periodic  Periodic
 
 # ── Geometry ───────────────────────────────────────────────────────────────
+# domain 2pi x 2pi 
 geometry.prob_lo    = 0.0  0.0
-geometry.prob_hi    = 1.0  1.0
+geometry.prob_hi    = 6.283185307179586  6.283185307179586
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 200
