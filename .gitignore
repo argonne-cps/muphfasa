@@ -1,4 +1,5 @@
 build/
+build?d/
 tmp_build_dir/
 .venv/
 .cache/
@@ -9,5 +10,11 @@ tests/regression/*/Backtrace.*
 tests/regression/*/convergence_runs/
 tests/regression/*/plot_runs/
 tests/regression/*/profile_run/
+tests/regression/*/plt???????/
+tests/regression/*/plt???????.old.*/
+tests/regression/*/analytic_plt???????/
+tests/regression/*/analytic_plt???????.old.*/
+tests/regression/*/chk???????/
+tests/regression/*/chk???????.old.*/
 __pycache__
 *.ex
