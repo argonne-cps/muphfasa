@@ -586,11 +586,70 @@ int run(const std::string& input_file)
     row("checkpoints", chkInt > 0 ? fmt("%lld  (every %d steps, prefix \"%s\")",
                                         static_cast<long long>(outputCount(chkInt)), chkInt, chkPrefix.c_str())
                                   : "disabled (amr.chk_int <= 0)");
-    if (has_stop) {
-        adv.push_back({false, "sim.stop_time is read by InputParser but not applied by the solver.",
-                       {"src/main.cpp loops to sim.max_step only, so a real run always stops at max_step. "
-                        "The estimate above shows which limit would trigger first if stop_time were honoured."}});
+
+    // ---- disk usage ----
+    // Sizes of the file contents (not rounded up to filesystem blocks). Every
+    // output gets a fresh directory (step number in the name), so they accumulate.
+    //   plotfile  : rho + velocity (1 + D components), valid cells, no ghosts
+    //   checkpoint: all Q distributions of f, including ghost cells of every box
+    // plus VisMF per-box FAB headers / min-max tables and the small Header files.
+    // fab.format (AMReX) sets the on-disk precision of plotfile FABs: NATIVE =
+    // sizeof(Real), NATIVE_32 and IEEE32 = 4 bytes. IEEE/ASCII/8BIT pass AMReX's
+    // startup check but VisMF aborts on the first plotfile write; any other
+    // string aborts at startup. writeCheckpoint() overrides the format to NATIVE
+    // for its own write, so checkpoints are always sizeof(Real) per value.
+    std::string fabFmt = "NATIVE";
+    {
+        amrex::ParmParse ppfab("fab");
+        ppfab.query("format", fabFmt);
     }
+    double plot_elem_bytes = sizeof(Real);
+    bool plot_writable = true;
+    if (fabFmt == "NATIVE_32" || fabFmt == "IEEE32") {
+        plot_elem_bytes = 4;
+    } else if (fabFmt == "IEEE" || fabFmt == "ASCII" || fabFmt == "8BIT") {
+        plot_writable = false;
+    } else if (fabFmt != "NATIVE") {
+        throw std::runtime_error(fmt("fab.format = \"%s\" is not a valid AMReX format "
+                                     "(use NATIVE, NATIVE_32 or IEEE32).", fabFmt.c_str()));
+    }
+    const double chk_elem_bytes = sizeof(Real);
+    if (!plot_writable && plotInt > 0) {
+        adv.push_back({true, fmt("fab.format = %s cannot be written by VisMF; the solver aborts at the first "
+                                 "plotfile write.", fabFmt.c_str()),
+                       {"Use NATIVE (double) or NATIVE_32 / IEEE32 (single precision), or disable "
+                        "plotfiles with amr.plot_int = 0. Checkpoints are unaffected: they are always "
+                        "written in NATIVE."}});
+    }
+
+    const int plot_ncomp = 1 + D;
+    const double plot_bytes = plot_elem_bytes * plot_ncomp * cells
+                            + boxes * (kBoxBytes + kBoxBytesPerComp * plot_ncomp) + kPlotHeaderBytes;
+    const double chk_bytes = chk_elem_bytes * lat.Q * cells_ghost
+                           + boxes * (kBoxBytes + kBoxBytesPerComp * lat.Q) + kChkHeaderBytes;
+    const std::int64_t n_plot = outputCount(plotInt);
+    const std::int64_t n_chk = outputCount(chkInt);
+    section("Disk usage (estimate)");
+    row("fab.format", plot_writable
+            ? fmt("%s  (plotfiles: %d bytes/value; checkpoints always NATIVE: %d)", fabFmt.c_str(),
+                  static_cast<int>(plot_elem_bytes), static_cast<int>(chk_elem_bytes))
+            : fmt("%s  (unsupported for plotfiles; checkpoints always NATIVE)", fabFmt.c_str()));
+    row("per plotfile", !plot_writable ? (plotInt > 0 ? "n/a (fab.format cannot be written)" : "n/a (plotfiles disabled)")
+            : plotInt > 0
+            ? fmt("~%s  (%d comps: rho, u; valid cells only)", humanBytes(plot_bytes).c_str(), plot_ncomp)
+            : "n/a (plotfiles disabled)");
+    if (lat.valid) {
+        row("per checkpoint", chkInt > 0
+                ? fmt("~%s  (%d distributions incl. %d ghost layer)", humanBytes(chk_bytes).c_str(), lat.Q, lat.nGhost)
+                : "n/a (checkpoints disabled)");
+    } else {
+        row("per checkpoint", "unknown (lattice not available in this build)");
+    }
+    const double plot_total = (plotInt > 0 && plot_writable) ? static_cast<double>(n_plot) * plot_bytes : 0.0;
+    const double chk_total = (chkInt > 0 && lat.valid) ? static_cast<double>(n_chk) * chk_bytes : 0.0;
+    row("plot total", fmt("~%s  (%lld files)", humanBytes(plot_total).c_str(), static_cast<long long>(plotInt > 0 ? n_plot : 0)));
+    row("checkpoint total", fmt("~%s  (%lld files)", humanBytes(chk_total).c_str(), static_cast<long long>(chkInt > 0 ? n_chk : 0)));
+    row("total", fmt("~%s", humanBytes(plot_total + chk_total).c_str()));
 
     // ---- tau / u_lat range analysis ----
     checkLatticeParams({units, lat.cs2, bc_ratio, pinned, ncells, D, static_cast<Real>(n_adv)}, adv);

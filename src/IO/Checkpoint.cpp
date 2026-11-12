@@ -42,7 +42,15 @@ void writeCheckpoint(const std::string&     dir_name,
     }
     amrex::ParallelDescriptor::Barrier();
 
+    // In checkpoint files, always write out FABs in NATIVE format
+    amrex::FABio::Format thePrevFormat = amrex::FArrayBox::getFormat();
+
+    amrex::FArrayBox::setFormat(amrex::FABio::FAB_NATIVE);
+
     amrex::VisMF::Write(f_mf, dir_name + "/f");
+
+    // Restore the previous FAB format.
+    amrex::FArrayBox::setFormat(thePrevFormat);
 
     amrex::Print() << "Checkpoint: wrote " << dir_name
                    << "  step=" << step << "  time=" << time << "\n";
