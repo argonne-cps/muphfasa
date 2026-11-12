@@ -1,4 +1,4 @@
-// test_uniform_force.cpp — Regression test: uniform body force, fully periodic.
+// main.cpp — Regression test: uniform body force, fully periodic.
 // Supports both 2D and 3D builds.
 //
 // With a quiescent start (reported u = 0; f is built from feq(rho, -F/(2 rho))

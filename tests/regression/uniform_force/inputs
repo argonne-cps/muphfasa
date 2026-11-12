@@ -1,7 +1,7 @@
 # Regression test: uniform body force on a fully periodic 2-D box.
 # Quiescent start (default initData), no walls: Sum(c f) grows by exactly F per
 # step, so after k advance() calls u = k * F / rho and rho stays 1
-# (see test_uniform_force.cpp and README.md). Independent of lbm.tau.
+# (see main.cpp and README.md). Independent of lbm.tau.
 
 grid.ncells      = 8 8
 grid.max_grid_size = 8

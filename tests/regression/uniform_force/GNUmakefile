@@ -16,6 +16,6 @@ DIM ?= 2
 
 EBASE = test_uniform_force
 
-CEXE_sources += test_uniform_force.cpp
+CEXE_sources += main.cpp
 
 include $(TOP)/Make.muphfasa

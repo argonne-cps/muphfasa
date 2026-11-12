@@ -7,7 +7,7 @@ velocity must be exactly
 
     u_k = k * F / rho,     rho_k = rho_0,
 
-and the field must stay spatially uniform. `test_uniform_force.cpp` checks this every
+and the field must stay spatially uniform. `main.cpp` checks this every
 step to 1e-12 and exits non-zero on failure. It exercises input parsing -> unit
 conversion -> forced collide -> forced macroscopic update -> `SimulationImpl` branch
 together, independent of the wall treatment.
