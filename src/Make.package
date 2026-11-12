@@ -8,6 +8,7 @@
 # src/LBM, src/Geometry, src/IO, src/Simulation subdirectories so these
 # sources are found regardless of which one they live in.
 
+CEXE_sources += main.cpp
 CEXE_sources += LatticeDescriptor.cpp
 CEXE_sources += Macroscopic.cpp
 CEXE_sources += Equilibrium.cpp
