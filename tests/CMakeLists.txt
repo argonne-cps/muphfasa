@@ -83,7 +83,7 @@ function(add_regression_analysis_test name)
         set(init_data ${DEFAULT_INIT_DATA})
     endif()
 
-    add_executable(test_${name} regression/${name}/test_${name}.cpp ${SOLVER_SOURCES_NO_MAIN} ${init_data})
+    add_executable(test_${name} regression/${name}/main.cpp ${SOLVER_SOURCES_NO_MAIN} ${init_data})
 
     target_include_directories(test_${name} PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/Simulation)
     target_link_libraries(test_${name} PRIVATE AMReX::amrex_${muphfasa_DIM}d)
