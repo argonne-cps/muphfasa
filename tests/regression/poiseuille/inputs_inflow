@@ -3,11 +3,11 @@
 #
 # The inlet is uniform, so the profile develops downstream; bc.lox_Uin is set
 # so the mass flux that actually enters matches the analytic mean velocity
-# (2/3) U_max of the body-force-driven parabola (see test_poiseuille.cpp for
+# (2/3) U_max of the body-force-driven parabola (see main.cpp for
 # the 3H/(3H-1) corner correction), and only the window
 # test.window (fractions of the length) is compared against it.
 #
-# Units chosen by hand (test_poiseuille.cpp asserts the Uin consistency):
+# Units chosen by hand (main.cpp asserts the Uin consistency):
 #   N_max = 96 (x), H = 16 cells, L_ref = 0.5, U_ref = 1, tau = 0.8 (nu_lat = 0.1)
 #   -> u_lat = 1/30, dx = 1/96, dt = 1/2880 s
 #   F_lat = 8 nu U_max/H^2 = 6.25e-5 for U_max_lat = 0.02

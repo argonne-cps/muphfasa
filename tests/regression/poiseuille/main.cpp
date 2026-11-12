@@ -1,4 +1,4 @@
-// test_poiseuille.cpp — Regression test: body-force-driven plane Poiseuille flow.
+// main.cpp — Regression test: body-force-driven plane Poiseuille flow.
 // Supports both 2D (AMREX_SPACEDIM=2) and 3D (AMREX_SPACEDIM=3) builds.
 //
 // Geometry: periodic in x (and y in 3D), NoSlip walls at y=lo/hi (2D) or

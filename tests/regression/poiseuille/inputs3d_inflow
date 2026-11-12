@@ -2,7 +2,7 @@
 # Inflow at x=lo and PressureOutlet at x=hi, periodic in y, NoSlip walls at
 # z=0 and z=H, force along x. Same lattice-unit setup as inputs_inflow
 # (N_max = 96, H = 16, tau = 0.8, F_lat = 6.25e-5, U_mean_phys = 0.4); see that
-# file and test_poiseuille.cpp for the 3H/(3H-1) inlet corner correction
+# file and main.cpp for the 3H/(3H-1) inlet corner correction
 # (valid for D3Q19/D3Q27 face diagonals).
 
 grid.ncells      = 96 4 16     # Nx Ny Nz

@@ -6,7 +6,7 @@ default) for the same *physical* problem (forcing.accel and units.* fixed),
 pinning lbm.tau at every resolution so nu_lat stays constant as dx shrinks
 (F_lat scales like dx^3 automatically). Every run goes to the same
 dimensionless time nu*t/H^2 (default 2.5, i.e. steady to ~1e-11), then the
-plt<step>/analytic_plt<step> pair written by test_poiseuille.cpp is diffed
+plt<step>/analytic_plt<step> pair written by main.cpp is diffed
 with AMReX's fcompare and the observed order of accuracy of the inf-norm
 error on vx is fitted across consecutive doublings of N.
 

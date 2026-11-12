@@ -8,7 +8,7 @@ force F, the steady state is
     u(y) = F/(2 nu) * y * (H - y)           (y = j + 1/2 at cell centres)
     U_max = F H^2 / (8 nu),  U_mean = F H^2 / (12 nu) = (2/3) U_max
 
-`test_poiseuille.cpp` prints the predicted `U_max`/`U_mean`/Mach number, writes
+`main.cpp` prints the predicted `U_max`/`U_mean`/Mach number, writes
 `pltXXXXXXX`/`analytic_pltXXXXXXX` pairs for `fcompare`, and at the end asserts
 (exit code 1 on failure) that the profile error, mean-velocity error (both relative to
 `U_max`, tolerance `test.max_rel_err`, default 1e-2), transverse velocity and density

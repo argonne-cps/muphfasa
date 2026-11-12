@@ -16,6 +16,6 @@ DIM ?= 2
 
 EBASE = test_poiseuille
 
-CEXE_sources += test_poiseuille.cpp
+CEXE_sources += main.cpp
 
 include $(TOP)/Make.muphfasa
