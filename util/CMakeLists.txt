@@ -1,0 +1,16 @@
+# CMakeLists for muphfasa's standalone helper tools (tools/).
+# Enabled with -Dmuphfasa_BUILD_TOOLS=ON; needs only the unit converter and
+# input parser, not the full solver.
+
+add_executable(muphfasa_inputinfo
+    input_checker/inputinfo.cpp
+    ${CMAKE_SOURCE_DIR}/src/LBM/Units.cpp
+    ${CMAKE_SOURCE_DIR}/src/IO/InputParser.cpp
+)
+
+target_include_directories(muphfasa_inputinfo PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(muphfasa_inputinfo PRIVATE AMReX::amrex_${muphfasa_DIM}d)
+
+if(AMReX_CUDA)
+    setup_target_for_cuda_compilation(muphfasa_inputinfo)
+endif()

@@ -10,11 +10,10 @@ sim.stop_time      = -1.0
 
 # ── LBM ────────────────────────────────────────────────────────────────────
 lbm.lattice_type   = D3Q19      # D3Q15 | D3Q19 | D3Q27
-lbm.tau            = 0.8
+lbm.tau            = 0.65
 
 # ── Physical / unit parameters ─────────────────────────────────────────────
 units.Re            = 100.0
-units.Ma            = 0.05
 units.ref_length    = 1.0
 units.ref_velocity  = 1.0
 units.ref_density   = 1.0

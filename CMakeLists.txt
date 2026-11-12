@@ -81,6 +81,12 @@ if(AMReX_CUDA)
     setup_target_for_cuda_compilation(muphfasa)
 endif()
 
+# ── Utilities ──────────────────────────────────────────────────────────────────
+option(muphfasa_BUILD_UTIL "Build standalone helper utils (util/)" OFF)
+if(muphfasa_BUILD_UTIL)
+    add_subdirectory(util)
+endif()
+
 # ── Tests ─────────────────────────────────────────────────────────────────────
 option(muphfasa_BUILD_TESTS "Build the validation and unit test suite" OFF)
 if(muphfasa_BUILD_TESTS)

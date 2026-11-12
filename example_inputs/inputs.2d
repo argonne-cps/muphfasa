@@ -11,18 +11,19 @@ sim.stop_time      = -1.0        # negative means run to max_step
 
 # ── LBM ────────────────────────────────────────────────────────────────────
 lbm.lattice_type   = D2Q9
-lbm.tau            = 0.8         # BGK relaxation time  (tau > 0.5 for stability)
+lbm.tau            = 0.65        # BGK relaxation time  (tau > 0.5 for stability)
+#lbm.u_lat = 0.1         # lattice velocity (tau and u_lat cannot both be set)
 
 # ── Physical / unit parameters ─────────────────────────────────────────────
 units.Re           = 100.0       # Reynolds number
-units.Ma           = 0.05        # Mach number (keep < 0.1 for accuracy)
+#units.nu_phys = 0.01       # [m^2/s] physical viscosity (Re and nu_phys cannot both be set)
 units.ref_length   = 1.0         # [m]
 units.ref_velocity = 1.0         # [m/s]
 units.ref_density  = 1.0         # [kg/m^3]
 
 # ── Geometry ───────────────────────────────────────────────────────────────
 geometry.prob_lo    = 0.0  0.0
-geometry.prob_hi    = 2.0  1.0
+geometry.prob_hi    = 2.0  1.0    # Note: domain size must align with ncells to ensure square grid cells
 geometry.type       = box         # "box" | "sphere" | "stl"
 geometry.use_eb     = 0
 
