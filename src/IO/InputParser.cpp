@@ -314,4 +314,12 @@ std::string InputParser::checkpointPrefix() const
     return val;
 }
 
+std::string InputParser::restartFile() const
+{
+    amrex::ParmParse pp("amr");
+    std::string val;
+    pp.query("restart", val);
+    return val;
+}
+
 } // namespace muphfasa

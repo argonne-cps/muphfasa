@@ -26,11 +26,11 @@ int main(int argc, char* argv[])
         const amrex::Real stop_time_lat = sim->units().toLatticeTime(params.stopTime());
         amrex::Print() << stop_time_lat << std::endl;
 
-        for (int step = 0; step <= max_step; ++step) {
+        for (int step = sim->startStep(); step <= max_step; ++step) {
+            if (stop_time_lat > 0 && stop_time_lat < sim->time()) {break;}
+
             sim->advance();
             sim->writeOutput(step);
-
-            if (stop_time_lat > 0 && stop_time_lat < sim->time()) {break;}
         }
     }
     amrex::Finalize();

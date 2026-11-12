@@ -40,7 +40,8 @@ public:
     ~SimulationImpl() override;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────
-    // Allocate MultiFabs, set initial conditions, and fill ghost cells.
+    // Set initial conditions and fill ghost cells, or, if amr.restart is set,
+    // load f / time from that checkpoint and fill ghost cells.
     void initialize() override;
 
     // Advance by one time step: 
@@ -58,6 +59,7 @@ public:
     const amrex::MultiFab& vel() const noexcept override { return m_vel; }
 
     amrex::Real time() const noexcept override { return m_time; }
+    int startStep() const noexcept override { return m_start_step; }
     amrex::Real omega() const noexcept override { return m_omega; }
     const UnitConverter& units() const noexcept override { return *m_units; }
     const amrex::Geometry& geom() const noexcept override { return m_geom; }
@@ -94,11 +96,15 @@ private:
     // ── Time tracking ─────────────────────────────────────────────────────
     amrex::Real m_time = amrex::Real(0.0);
 
+    // ── First loop step (0, or checkpoint step + 1 after a restart) ───────
+    int m_start_step = 0;
+
     // ── Step of last macro update ─────────────────────────────────────────
     int m_macro_update_step = -1;
 
     // ── Private helpers ───────────────────────────────────────────────────
     void setInitialConditions();
+    void restartFromCheckpoint(const std::string& dir_name);
     void fillGhostCells();
     void buildBCManager();
     void reportStageTiming(int step) const;

@@ -44,6 +44,11 @@ namespace lim = muphfasa::unit_limits;
 // default, and a tau that leaves some margin above the ideal lower bound.
 constexpr Real kTauComfort = Real(0.7);
 
+// VisMF/plotfile metadata overhead, fitted to measured output. Per box: a FAB
+// header plus a min/max table row per component. Small next to the data.
+constexpr double kBoxBytes = 130, kBoxBytesPerComp = 50;
+constexpr double kPlotHeaderBytes = 600, kChkHeaderBytes = 100;
+
 #if defined(__GNUC__)
 __attribute__((format(printf, 1, 2)))
 #endif
@@ -131,7 +136,7 @@ std::vector<int> scaledCells(const std::vector<int>& N, Real f)
 
 std::string humanBytes(double b)
 {
-    const char* unit[] = {"B", "kB", "MB", "GB", "TB"};
+    const char* unit[] = {"B", "KiB", "MiB", "GiB", "TiB"};
     int i = 0;
     while (b >= 1024.0 && i < 4) { b /= 1024.0; ++i; }
     return fmt("%.3g %s", b, unit[i]);
@@ -487,17 +492,46 @@ int run(const std::string& input_file)
     }
     const Real bc_ratio = bc_speed_max / Uref;
 
-    // ---- time stepping ----
-    // main.cpp loops step = 0..max_step inclusive: max_step + 1 advances.
+    // ---- time stepping (mirrors the loop in src/main.cpp) ----
+    // for step = start..max_step: stop if 0 < stop_time_lat < t_lat, else advance
+    // (t_lat -> step+1) and write output. A fresh run starts at step 0, so max_step
+    // gives max_step + 1 advances, and stop_time ends the run after the first
+    // advance with t_lat > stop_time_lat. max_step / stop_time are absolute, so a
+    // restart (below) only changes where the loop starts.
     const std::int64_t adv_maxstep = static_cast<std::int64_t>(maxStep) + 1;
+    const Real stop_lat = units.toLatticeTime(stopTime);
     const bool has_stop = stopTime > Real(0);
-    std::int64_t adv_stop = 0;
-    if (has_stop && dt_ok) {
-        adv_stop = static_cast<std::int64_t>(std::ceil(stopTime / dt * (1.0 - 1e-12)));
-    }
-    const bool stop_first = has_stop && dt_ok && adv_stop < adv_maxstep;
+    const bool stop_active = dt_ok && std::isfinite(stop_lat) && stop_lat > Real(0);
+    const std::int64_t adv_stop = stop_active ? static_cast<std::int64_t>(std::floor(stop_lat)) + 1 : 0;
+    const bool stop_first = stop_active && adv_stop < adv_maxstep;
+    const bool limits_tie = stop_active && adv_stop == adv_maxstep;
     const std::int64_t n_adv = stop_first ? adv_stop : adv_maxstep;
     const std::int64_t last_step = std::max<std::int64_t>(n_adv - 1, 0);
+
+    // ---- restart (amr.restart): the loop resumes at the checkpoint's step + 1 ----
+    // Only the Header's version/step/time lines are read; the solver itself
+    // validates the domain and lattice against the checkpoint.
+    const std::string restartDir = params.restartFile();
+    bool restart_found = false;
+    std::int64_t first_step = 0;
+    double restart_time = 0.0;
+    if (!restartDir.empty()) {
+        std::ifstream hdr(restartDir + "/Header");
+        std::string version;
+        std::int64_t chk_step = 0;
+        double chk_time = 0.0;
+        if ((hdr >> version >> chk_step >> chk_time) && version.rfind("muphfasa_checkpoint_", 0) == 0) {
+            restart_found = true;
+            first_step = chk_step + 1;
+            restart_time = chk_time;
+        } else {
+            adv.push_back({true, fmt("amr.restart = \"%s\": no readable checkpoint Header found; the solver aborts.",
+                                     restartDir.c_str()),
+                           {"The path is relative to the directory the solver is run from "
+                            "(and this tool: run it from the same directory)."}});
+        }
+    }
+    const std::int64_t n_run = std::max<std::int64_t>(n_adv - first_step, 0);
 
     // ---- memory estimate (two f copies + rho + vel, ghost cells per box) ----
     double cells = 1.0, cells_ghost = 1.0, boxes = 1.0;
@@ -564,22 +598,40 @@ int run(const std::string& input_file)
     section("Time stepping (estimate)");
     row("sim.max_step", fmt("%d  ->  loop runs steps 0..%d = %lld advances", maxStep, maxStep,
                             static_cast<long long>(adv_maxstep)));
-    if (has_stop) {
-        row("sim.stop_time", dt_ok ? fmt("%.6g s  ->  %lld advances", stopTime, static_cast<long long>(adv_stop))
-                                   : fmt("%.6g s  (dt not positive; cannot convert)", stopTime));
+    if (stop_active) {
+        row("sim.stop_time", fmt("%.6g s = %.6g lattice  ->  loop breaks after %lld advances",
+                                 stopTime, stop_lat, static_cast<long long>(adv_stop)));
+    } else if (has_stop) {
+        row("sim.stop_time", fmt("%.6g s  (dt not positive; cannot convert)", stopTime));
     } else {
         row("sim.stop_time", fmt("%.6g  (disabled; <= 0)", stopTime));
     }
-    row("limit hit first", stop_first ? "sim.stop_time" : "sim.max_step");
+    row("limit hit first", stop_first ? "sim.stop_time" : (limits_tie ? "both (same step)" : "sim.max_step"));
     row("total", fmt("%lld steps (last step index %lld)", static_cast<long long>(n_adv),
                      static_cast<long long>(last_step)));
+    if (!restartDir.empty()) {
+        row("amr.restart", restart_found
+                ? fmt("%s  (step %lld, lattice t = %.6g)", restartDir.c_str(),
+                      static_cast<long long>(first_step - 1), restart_time)
+                : fmt("%s  (no readable checkpoint found)", restartDir.c_str()));
+        if (restart_found) {
+            row("this run", n_run > 0
+                    ? fmt("resumes at step %lld: %lld of %lld advances remain", static_cast<long long>(first_step),
+                          static_cast<long long>(n_run), static_cast<long long>(n_adv))
+                    : std::string("nothing to do: the checkpoint is already at or past the end of the run"));
+        }
+    }
     if (dt_ok) {
         row("end time", fmt("t = %.6g s  (lattice t = %lld)", n_adv * dt, static_cast<long long>(n_adv)));
         row("flow-throughs", fmt("%.4g  (end time * U_ref / L_domain)", n_adv * dt * Uref / units.domainLength()));
     } else {
         row("end time", "unavailable (dt is not positive)");
     }
-    auto outputCount = [&](int interval) -> std::int64_t { return interval > 0 ? last_step / interval + 1 : 0; };
+    // Outputs written by this run: steps first_step..last_step that are multiples of interval.
+    auto outputCount = [&](int interval) -> std::int64_t {
+        if (interval <= 0 || (first_step > 0 && last_step < first_step)) { return 0; }
+        return first_step > 0 ? last_step / interval - (first_step - 1) / interval : last_step / interval + 1;
+    };
     row("plotfiles", plotInt > 0 ? fmt("%lld  (every %d steps, prefix \"%s\")",
                                        static_cast<long long>(outputCount(plotInt)), plotInt, plotPrefix.c_str())
                                  : "disabled (amr.plot_int <= 0)");
@@ -702,11 +754,17 @@ int main(int argc, char* argv[])
 
     // Quiet AMReX banner, and turn Abort/Assert/ParmParse failures into
     // exceptions so bad input prints a message instead of a backtrace.
-    amrex::Initialize(argc, argv, std::function<void()>([] {
-        amrex::ParmParse pp("amrex");
-        pp.add("verbose", 0);
-        pp.add("throw_exception", 1);
-    }));
+    try {
+        amrex::Initialize(argc, argv, std::function<void()>([] {
+            amrex::ParmParse pp("amrex");
+            pp.add("verbose", 0);
+            pp.add("throw_exception", 1);
+        }));
+    } catch (const std::exception&) {
+        std::cerr << "ERROR: AMReX rejected the input file during startup (see the message above;\n"
+                     "       valid fab.format values are NATIVE, NATIVE_32 and IEEE32).\n";
+        return 1;
+    }
     int rc = 0;
     try {
         rc = run(input_file);
