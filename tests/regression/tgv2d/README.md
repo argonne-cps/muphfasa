@@ -14,8 +14,8 @@ This test is 2-D only (`D2Q9`, `inputs`).
 
 ```sh
 # GNUMake (from this directory — DIM=2, no MPI)
-make                      # -> test_tgv2d2d.gnu.ex
-./test_tgv2d2d.gnu.ex inputs
+make                      # -> test_tgv2d.gnu.ex
+./test_tgv2d.gnu.ex inputs
 
 # CMake (from repo root)
 cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON
@@ -46,7 +46,7 @@ field is read instead), and plots:
    against the analytic one.
 
 ```sh
-make                   # build test_tgv2d2d.gnu.ex, if not already built
+make                   # build test_tgv2d.gnu.ex, if not already built
 pip install -r ../../requirements-optional.txt  # one-time; optional yt dep
                                                 # (from repo root: tests/requirements-optional.txt)
 python3 plot_tgv2d.py  # runs the solver, then plots
@@ -79,7 +79,7 @@ Unlike plane Couette, neither velocity component is trivially zero for TGV,
 so both `vx` and `vy` errors are tracked.
 
 ```sh
-make                     # build test_tgv2d2d.gnu.ex, if not already built
+make                     # build test_tgv2d.gnu.ex, if not already built
 python3 convergence.py  # builds fcompare (DIM=2) on first run, then runs the study
 ```
 
@@ -98,7 +98,7 @@ order falls below this), `--csv <path>`, `--plot <path>`, `--no-plot`.
 
 ## CI
 
-`.github/workflows/tgv2d-regression.yml` builds `test_tgv2d2d.gnu.ex` and
+`.github/workflows/tgv2d-regression.yml` builds `test_tgv2d.gnu.ex` and
 runs the grid-convergence study on every push/PR touching `src/`,
 `tests/regression/tgv2d/`, or the AMReX submodule:
 `convergence.py --n-list 32 64 128 --min-order 1.2` (leaves roughly an order

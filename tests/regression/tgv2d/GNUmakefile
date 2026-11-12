@@ -4,7 +4,7 @@
 #
 # Usage:
 #   make                    # build test_tgv2d (2-D, no MPI, by default)
-#   ./test_tgv2d2d.gnu.ex inputs
+#   ./test_tgv2d.gnu.ex inputs
 #
 # The InitData.cpp in this directory resolves to THIS directory's own copy
 # (the Taylor-Green initial condition), not src/Simulation/InitData.cpp's

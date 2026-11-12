@@ -17,7 +17,7 @@ component is trivially zero for TGV, so both are tracked.)
 
 Usage:
     cd tests/regression/tgv2d
-    make                       # build test_tgv2d2d.gnu.ex, if not already
+    make                       # build test_tgv2d.gnu.ex, if not already
     python3 convergence.py     # builds fcompare itself, then runs the study
 
 Requires only the Python standard library (except for plotting via matplotlib).
