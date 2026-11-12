@@ -4,7 +4,7 @@
 // Geometry: periodic in x (and y in 3D), NoSlip walls at y=lo/hi (2D) or
 // z=lo/hi (3D), uniform body force (forcing.accel, along x) driving the flow.
 // With H = wall-normal cell count (halfway-bounce-back convention, same as
-// test_couette.cpp) the steady Stokes balance nu u'' + F = 0 gives
+// main.cpp) the steady Stokes balance nu u'' + F = 0 gives
 //     u(y) = F/(2 nu) * y * (H - y),   y = j + 1/2 at cell centres,
 //     U_max = F H^2 / (8 nu),          U_mean = F H^2 / (12 nu) = (2/3) U_max
 // (all in lattice units, F = toLatticeAcceleration(forcing.accel[0])).

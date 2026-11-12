@@ -2,7 +2,7 @@
 # Bottom wall (z=lo) stationary (NoSlip); top wall (z=hi) moving at U0
 # (MovingWall); periodic in x and y. No pressure gradient.
 # Wall-normal is z in 3-D so faverage (which averages along the last
-# dimension) returns the z-profile; see test_couette.cpp WALL_DIM.
+# dimension) returns the z-profile; see main.cpp WALL_DIM.
 #
 # Steady-state analytic solution: linear velocity profile
 #   u(z) = U0 * z/H
@@ -10,7 +10,7 @@
 # for t<=0, top wall set to U0 for t>0), solving du/dt = nu * d^2u/dz^2:
 #   u(z,t)/U0 = z/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*z/H)
 #                     * exp(-n^2*pi^2*nu*t/H^2)
-# which is what test_couette.cpp checks the simulated profile against.
+# which is what main.cpp checks the simulated profile against.
 #
 # H (wall-to-wall distance, lattice units) = grid.ncells[2], per the
 # standard halfway-bounce-back convention (wall sits half a cell beyond

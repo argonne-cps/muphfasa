@@ -1,7 +1,7 @@
 // main.cpp — Regression test: 2-D Taylor-Green vortex decay.
 //
 // Uses the normal InputParser/ISimulation/advance() machinery (see
-// tests/regression/couette/test_couette.cpp, which this mirrors) with the
+// tests/regression/couette/main.cpp, which this mirrors) with the
 // non-quiescent initial condition supplied by this directory's own
 // InitData.cpp (see TgvAnalytic.H for the analytic solution it and this
 // file both use).

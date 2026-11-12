@@ -10,7 +10,7 @@ so the comparison to the analytic solution is apples-to-apples across
 resolutions.
 
 Each run writes a matching plt<step>/analytic_plt<step> pair (already done
-by test_couette.cpp); this script diffs that pair with AMReX's fcompare
+by main.cpp); this script diffs that pair with AMReX's fcompare
 tool and fits the observed order of accuracy from the inf-norm error on vx
 across consecutive doublings of Ny. (vy is identically zero for plane
 Couette flow, so its fcompare "error" is pure round-off with no real

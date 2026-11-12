@@ -1,4 +1,4 @@
-// test_couette.cpp — Regression test: plane Couette flow startup + steady state.
+// main.cpp — Regression test: plane Couette flow startup + steady state.
 // Supports both 2D (AMREX_SPACEDIM=2) and 3D (AMREX_SPACEDIM=3) builds.
 //
 // Geometry: periodic in x (and y in 3D), NoSlip wall at y=lo (2D) or z=lo (3D),

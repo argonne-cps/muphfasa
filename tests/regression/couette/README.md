@@ -4,8 +4,8 @@ Plane Couette flow: periodic in x (and y in 3D), stationary wall at y=lo (2D) or
 z=lo (3D) and moving wall at y=hi (2D) or z=hi (3D) at U0. Checks the simulated
 velocity profile against the analytic time-dependent plane-Couette-startup
 solution, both during the transient and at steady state. See the comment block
-at the top of `test_couette.cpp` for the full derivation. The single source
-`test_couette.cpp` builds for both 2D (`WALL_DIM=y`) and 3D (`WALL_DIM=z`, so
+at the top of `main.cpp` for the full derivation. The single source
+`main.cpp` builds for both 2D (`WALL_DIM=y`) and 3D (`WALL_DIM=z`, so
 `faverage` with `DIM=3` averaging along z matches the wall normal).
 
 ## Build and run

@@ -9,7 +9,7 @@ dimensionless time nu*t/H^2 (H=Nz, well before steady state) so the
 comparison is apples-to-apples across resolutions.
 
 Each run writes a matching plt<step>/analytic_plt<step> pair (already done
-by test_couette.cpp with WALL_DIM=z); this script diffs that pair with
+by main.cpp with WALL_DIM=z); this script diffs that pair with
 AMReX's fcompare tool and fits the observed order from the inf-norm error
 on vx across consecutive doublings of Nz. (vy and vz are identically zero
 for plane Couette flow, so their fcompare "error" is pure round-off.)

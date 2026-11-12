@@ -17,6 +17,6 @@ DIM ?= 2
 
 EBASE = test_couette
 
-CEXE_sources += test_couette.cpp
+CEXE_sources += main.cpp
 
 include $(TOP)/Make.muphfasa

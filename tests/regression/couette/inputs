@@ -8,7 +8,7 @@
 # for t<=0, top wall set to U0 for t>0), solving du/dt = nu * d^2u/dy^2:
 #   u(y,t)/U0 = y/H + sum_{n=1}^inf [2*(-1)^n/(n*pi)] * sin(n*pi*y/H)
 #                     * exp(-n^2*pi^2*nu*t/H^2)
-# which is what tests/regression/couette/test_couette.cpp checks the
+# which is what tests/regression/couette/main.cpp checks the
 # simulated profile against, both at late times (steady state) and
 # throughout the startup transient (time-dependent convergence).
 #
@@ -61,6 +61,4 @@ geometry.prob_hi    = 0.125  1.0
 
 # ── Output ─────────────────────────────────────────────────────────────────
 amr.plot_int        = 50
-amr.chk_int         = 5000
-amr.plot_file       = plt
-amr.check_file      = chk
+amr.chk_int         = -1

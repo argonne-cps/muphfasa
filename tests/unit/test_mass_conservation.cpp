@@ -3,7 +3,7 @@
 // Total mass (sum rho over valid cells) must be conserved to ~1e-12.
 //
 // This mirrors the regression drivers in tests/regression/tgv2d/main.cpp
-// and tests/regression/couette/test_couette.cpp:
+// and tests/regression/couette/main.cpp:
 //   InputParser params; auto sim = makeSimulation(params); sim->initialize();
 //   for (step) { sim->advance(); sim->writeOutput(step); }
 // Here we exercise the same ISimulation::advance() path (collide -> FillBoundary
