@@ -16,7 +16,7 @@ namespace muphfasa {
 
 // Stability / accuracy limits for the lattice parameters. The constructor
 // aborts outside the hard limits and warns outside the ideal ones;
-// util/input_checker/inputinfo.cpp reuses them to report (not abort) and suggest fixes.
+// util/input_info/input_info.cpp reuses them to report (not abort) and suggest fixes.
 namespace unit_limits {
 constexpr amrex::Real tau_hard_lo     = amrex::Real(0.5);   // tau must exceed this
 constexpr amrex::Real tau_hard_hi     = amrex::Real(2.0);   // tau must stay below this

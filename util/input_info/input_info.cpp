@@ -1,4 +1,4 @@
-// inputinfo.cpp — Standalone inspector for muphfasa input files.
+// input_info.cpp — Standalone inspector for muphfasa input files.
 //
 // Reads an input file with the solver's own InputParser, builds the solver's
 // UnitConverter from it, and prints what the solver would start with: grid,
