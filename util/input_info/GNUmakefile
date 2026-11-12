@@ -9,9 +9,9 @@
 #   make DIM=2 USE_MPI=TRUE    MPI build (not needed: the tool is serial)
 #   make DIM=2 realclean       remove build products for this configuration
 #
-# The result is muphfasa_inputinfo<dim>d.<comp>[.<opts>].ex, e.g.
-# muphfasa_inputinfo2d.gnu.ex. The dimension must match the input file being
-# inspected, so build the one you need. Usage: ./muphfasa_inputinfo2d.gnu.ex <inputs>
+# The result is input_info<dim>d.<comp>[.<opts>].ex, e.g.
+# input_info2d.gnu.ex. The dimension must match the input file being
+# inspected, so build the one you need. Usage: ./input_info2d.gnu.ex <inputs>
 # AMREX_HOME is taken from the environment if set, else external/amrex.
 
 TOP := ../..

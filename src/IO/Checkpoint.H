@@ -6,10 +6,12 @@
 #ifndef MUPHFASA_CHECKPOINT_H
 #define MUPHFASA_CHECKPOINT_H
 
+#include <AMReX_Box.H>
 #include <AMReX_Geometry.H>
 #include <AMReX_MultiFab.H>
 
 #include <string>
+#include <vector>
 
 namespace muphfasa {
 
@@ -22,6 +24,27 @@ void writeCheckpoint(const std::string&     dir_name,
                      const amrex::Geometry& geom,
                      int                    step,
                      amrex::Real            time);
+
+// Scalar metadata stored in <checkpoint>/Header.
+struct CheckpointHeader {
+    std::string version;
+    int         step  = 0;
+    amrex::Real time  = 0;   // lattice units
+    amrex::Box  domain;
+    int         ncomp = 0;   // distribution components (lattice Q)
+};
+
+// Parse <dir_name>/Header into h. Returns an empty string on success, otherwise
+// a description of the problem (missing, unknown version, malformed).
+std::string readCheckpointHeader(const std::string& dir_name, CheckpointHeader& h);
+
+// Compare a parsed header with this run's domain and component count.
+// Returns one message per mismatch (empty if the checkpoint is compatible).
+// readCheckpoint aborts on any of these; the input_info utility reports them.
+std::vector<std::string> checkpointMismatches(const std::string&      dir_name,
+                                              const CheckpointHeader& h,
+                                              const amrex::Box&       domain,
+                                              int                     ncomp);
 
 // Read a checkpoint written by writeCheckpoint.
 // Fills the valid cells of f_mf and returns the step and time at which it was

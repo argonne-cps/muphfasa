@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace muphfasa {
 
@@ -57,6 +58,50 @@ void writeCheckpoint(const std::string&     dir_name,
                    << "  step=" << step << "  time=" << time << "\n";
 }
 
+std::string readCheckpointHeader(const std::string& dir_name, CheckpointHeader& h)
+{
+    std::ifstream hdr(dir_name + "/Header");
+    if (!hdr) {
+        return "no Header file found in " + dir_name;
+    }
+    hdr >> h.version;
+    if (h.version != kCheckpointVersion) {
+        return "unrecognized checkpoint version \"" + h.version + "\" in " + dir_name +
+               " (expected " + kCheckpointVersion + ")";
+    }
+    // The domain is read from its own line: amrex::Box's operator>> aborts on
+    // malformed text instead of failing the stream.
+    std::string domain_line;
+    hdr >> h.step >> h.time >> std::ws;
+    std::getline(hdr, domain_line);
+    std::istringstream domain_stream(domain_line);
+    if (!hdr || domain_line.rfind("((", 0) != 0 || !(domain_stream >> h.domain) || !(hdr >> h.ncomp)) {
+        return "malformed Header in " + dir_name;
+    }
+    return {};
+}
+
+std::vector<std::string> checkpointMismatches(const std::string&      dir_name,
+                                              const CheckpointHeader& h,
+                                              const amrex::Box&       domain,
+                                              int                     ncomp)
+{
+    std::vector<std::string> problems;
+    if (h.domain != domain) {
+        std::ostringstream msg;
+        msg << "domain mismatch: " << dir_name << " was written for " << h.domain
+            << " but this run has " << domain << " (check grid.ncells)";
+        problems.push_back(msg.str());
+    }
+    if (h.ncomp != ncomp) {
+        std::ostringstream msg;
+        msg << dir_name << " holds " << h.ncomp << " distribution components but this run needs "
+            << ncomp << " (check lbm.lattice_type)";
+        problems.push_back(msg.str());
+    }
+    return problems;
+}
+
 void readCheckpoint(const std::string&    dir_name,
                     amrex::MultiFab&      f_mf,
                     const amrex::Geometry& geom,
@@ -65,37 +110,21 @@ void readCheckpoint(const std::string&    dir_name,
 {
     BL_PROFILE("readCheckpoint()");
 
-    if (!checkpointExists(dir_name)) {
-        amrex::Abort("readCheckpoint: no Header file found in " + dir_name);
+    CheckpointHeader h;
+    if (const std::string err = readCheckpointHeader(dir_name, h); !err.empty()) {
+        amrex::Abort("readCheckpoint: " + err);
     }
-
-    std::ifstream hdr(dir_name + "/Header");
-    std::string version;
-    hdr >> version;
-    if (version != kCheckpointVersion) {
-        amrex::Abort("readCheckpoint: unrecognized checkpoint version in " + dir_name);
+    const std::vector<std::string> problems =
+        checkpointMismatches(dir_name, h, geom.Domain(), f_mf.nComp());
+    if (!problems.empty()) {
+        std::string msg = "readCheckpoint: " + problems.front();
+        for (std::size_t i = 1; i < problems.size(); ++i) { msg += "; " + problems[i]; }
+        amrex::Abort(msg);
     }
-
-    amrex::Box domain;
-    int ncomp = 0;
-    hdr >> step >> time >> domain >> ncomp;
-    if (!hdr) {
-        amrex::Abort("readCheckpoint: malformed Header in " + dir_name);
-    }
-
-    if (domain != geom.Domain()) {
-        std::ostringstream msg;
-        msg << "readCheckpoint: domain mismatch. " << dir_name << " was written for " << domain
-            << " but this run has " << geom.Domain() << " (check grid.ncells)";
-        amrex::Abort(msg.str());
-    }
-    if (ncomp != f_mf.nComp()) {
-        std::ostringstream msg;
-        msg << "readCheckpoint: " << dir_name << " holds " << ncomp
-            << " distribution components but this run needs " << f_mf.nComp()
-            << " (check lbm.lattice_type)";
-        amrex::Abort(msg.str());
-    }
+    step = h.step;
+    time = h.time;
+    const amrex::Box& domain = h.domain;
+    const int ncomp = h.ncomp;
 
     // Read with the checkpoint's own layout, then copy valid cells into f_mf.
     amrex::MultiFab tmp;

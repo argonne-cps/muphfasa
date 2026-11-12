@@ -19,6 +19,7 @@
 #include <AMReX_ParmParse.H>
 #include <AMReX_Print.H>
 
+#include "IO/Checkpoint.H"
 #include "IO/InputParser.H"
 #include "LBM/LatticeDescriptor.H"
 #include "LBM/Units.H"
@@ -32,6 +33,7 @@
 #include <functional>
 #include <iostream>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -509,26 +511,48 @@ int run(const std::string& input_file)
     const std::int64_t last_step = std::max<std::int64_t>(n_adv - 1, 0);
 
     // ---- restart (amr.restart): the loop resumes at the checkpoint's step + 1 ----
-    // Only the Header's version/step/time lines are read; the solver itself
-    // validates the domain and lattice against the checkpoint.
+    // The Header is parsed and checked with the solver's own readCheckpoint
+    // helpers (IO/Checkpoint.cpp), so a mismatch reported here is one the solver
+    // would abort on. The data files (<dir>/f_H, f_D_*) are not read.
     const std::string restartDir = params.restartFile();
     bool restart_found = false;
     std::int64_t first_step = 0;
     double restart_time = 0.0;
+    std::string restart_check;   // one-line outcome of the compatibility check
     if (!restartDir.empty()) {
-        std::ifstream hdr(restartDir + "/Header");
-        std::string version;
-        std::int64_t chk_step = 0;
-        double chk_time = 0.0;
-        if ((hdr >> version >> chk_step >> chk_time) && version.rfind("muphfasa_checkpoint_", 0) == 0) {
-            restart_found = true;
-            first_step = chk_step + 1;
-            restart_time = chk_time;
-        } else {
-            adv.push_back({true, fmt("amr.restart = \"%s\": no readable checkpoint Header found; the solver aborts.",
+        CheckpointHeader chk;
+        const std::string err = readCheckpointHeader(restartDir, chk);
+        if (!err.empty()) {
+            restart_check = "cannot check (" + err + ")";
+            adv.push_back({true, fmt("amr.restart = \"%s\": the solver aborts when reading this checkpoint.",
                                      restartDir.c_str()),
-                           {"The path is relative to the directory the solver is run from "
-                            "(and this tool: run it from the same directory)."}});
+                           {err, "The path is relative to the directory the solver is run from "
+                                 "(and this tool: run it from the same directory)."}});
+        } else {
+            restart_found = true;
+            first_step = chk.step + 1;
+            restart_time = chk.time;
+
+            amrex::IntVect hi_cell;
+            for (int i = 0; i < D; ++i) { hi_cell[i] = ncells[i] - 1; }
+            const amrex::Box run_domain(amrex::IntVect(0), hi_cell);
+            // An unavailable lattice has no known component count: skip that comparison.
+            const int run_ncomp = lat.valid ? lat.Q : chk.ncomp;
+            const std::vector<std::string> bad = checkpointMismatches(restartDir, chk, run_domain, run_ncomp);
+
+            std::ostringstream hs;
+            hs << "domain " << chk.domain << ", " << chk.ncomp << " components";
+            if (bad.empty()) {
+                restart_check = std::string("compatible (") + hs.str() + (lat.valid ? "" : "; lattice unknown, components unchecked") + ")";
+            } else {
+                restart_check = fmt("INCOMPATIBLE: %d problem(s), see warnings", static_cast<int>(bad.size()));
+                adv.push_back({true, fmt("amr.restart = \"%s\" does not match this input; the solver aborts.",
+                                         restartDir.c_str()), bad});
+            }
+            if (!std::ifstream(restartDir + "/f_H").good()) {
+                adv.push_back({true, fmt("amr.restart = \"%s\": data file f_H is missing (incomplete checkpoint?).",
+                                         restartDir.c_str()), {}});
+            }
         }
     }
     const std::int64_t n_run = std::max<std::int64_t>(n_adv - first_step, 0);
@@ -614,6 +638,7 @@ int run(const std::string& input_file)
                 ? fmt("%s  (step %lld, lattice t = %.6g)", restartDir.c_str(),
                       static_cast<long long>(first_step - 1), restart_time)
                 : fmt("%s  (no readable checkpoint found)", restartDir.c_str()));
+        row("restart check", restart_check);
         if (restart_found) {
             row("this run", n_run > 0
                     ? fmt("resumes at step %lld: %lld of %lld advances remain", static_cast<long long>(first_step),
