@@ -13,14 +13,7 @@
 namespace muphfasa {
 
 namespace {
-// Lattice reference velocity used when the user pins neither u_lat nor tau.
-// Kept well below the lattice sound speed (cs = 1/sqrt(3) ~ 0.577) to keep
-// compressibility error low while staying comfortably inside the BGK
-// stability region; this is a standard convention (see e.g. Kruger et al.,
-// "The Lattice Boltzmann Method", Ch. 7, unit conversion).
-constexpr amrex::Real kDefaultLatticeVelocity = amrex::Real(0.1);
-
-// Relative tolerance for the u_lat/tau cross-check below.
+// Relative tolerance for the square lattice check.
 constexpr amrex::Real kConsistencyTol = amrex::Real(1.0e-12);
 }
 
@@ -34,7 +27,8 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
                              std::optional<amrex::Real> Re,
                              std::optional<amrex::Real> nu_phys,
                              std::optional<amrex::Real> u_lat,
-                             std::optional<amrex::Real> tau)
+                             std::optional<amrex::Real> tau,
+                             bool inspect_only)
     : m_L_ref(L_ref), m_U_ref(U_ref),  m_rho_ref(rho_ref), m_cs2(cs2)
 {
     // calc domain resolution
@@ -77,7 +71,7 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
     } else if (u_lat) {
         m_u_lat = *u_lat;
     } else {
-        m_u_lat = kDefaultLatticeVelocity;
+        m_u_lat = unit_limits::u_lat_default;
     }
 
     // set time converstion
@@ -89,24 +83,28 @@ UnitConverter::UnitConverter(amrex::Real L_ref,
     // set tau
     m_tau = 0.5 + m_nu_lat / m_cs2;
 
+    // diagnostic callers check the limits and report on them themselves
+    if (inspect_only) { return; }
+
     // warn if tau or u_lat close to stability bounds
-    if ((m_tau > 1.5) || (m_tau < 0.6)){
+    if ((m_tau > unit_limits::tau_ideal_hi) || (m_tau < unit_limits::tau_ideal_lo)){
     amrex::Print() << "Warning: the value of tau: " << m_tau <<
                       " is outside ideal range of 0.6 < tau < 1.5\n";
 
     }
-    if (m_u_lat > 0.15) {
+    if (m_u_lat > unit_limits::u_lat_ideal_hi) {
     amrex::Print() << "Warning: the value of u_lat: " << m_u_lat <<
                       " is close to violating low Mach number constraint\n";
 
     }
 
     // confirm stability
-    AMREX_ALWAYS_ASSERT_WITH_MESSAGE((m_tau > 0.5) && (m_tau < 2.0),
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE((m_tau > unit_limits::tau_hard_lo) &&
+                                     (m_tau < unit_limits::tau_hard_hi),
                 "tau is not within the stability range 0.5 < tau < 2.0."
                 "Alter lbm.tau or lbm.u_lat to fix.");
 
-    AMREX_ALWAYS_ASSERT_WITH_MESSAGE((m_u_lat < 0.3),
+    AMREX_ALWAYS_ASSERT_WITH_MESSAGE((m_u_lat < unit_limits::u_lat_hard_hi),
                 "u_lat does not satisfy low Mach number limit"
                 "Alter lbm.u_lat to fix.");
 
@@ -151,14 +149,14 @@ void UnitConverter::setGridResolution(std::vector<int> Ncells,
 
     // check lattice is square
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-            std::abs(gridRes[0] - gridRes[1]) < 1e-12,
+            std::abs(gridRes[0] - gridRes[1]) < kConsistencyTol,
                                 "Lattice must be sqaure (Lx/Nx == Ly/Ny)");
 #if (AMREX_SPACEDIM == 3)
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-            std::abs(gridRes[0] - gridRes[2]) < 1e-12,
+            std::abs(gridRes[0] - gridRes[2]) < kConsistencyTol,
                                 "Lattice must be sqaure (Lx/Nx == Lz/Nz)");
     AMREX_ALWAYS_ASSERT_WITH_MESSAGE(
-            std::abs(gridRes[1] - gridRes[2]) < 1e-12,
+            std::abs(gridRes[1] - gridRes[2]) < kConsistencyTol,
                                 "Lattice must be sqaure (Ly/Ny == Lz/Nz)");
 #endif
 
