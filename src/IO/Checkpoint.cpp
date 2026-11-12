@@ -6,6 +6,7 @@
 #include "Checkpoint.H"
 
 #include <AMReX_BLProfiler.H>
+#include <AMReX_Box.H>
 #include <AMReX_ParallelDescriptor.H>
 #include <AMReX_Print.H>
 #include <AMReX_Utility.H>
@@ -56,10 +57,11 @@ void writeCheckpoint(const std::string&     dir_name,
                    << "  step=" << step << "  time=" << time << "\n";
 }
 
-void readCheckpoint(const std::string& dir_name,
-                    amrex::MultiFab&   f_mf,
-                    int&               step,
-                    amrex::Real&       time)
+void readCheckpoint(const std::string&    dir_name,
+                    amrex::MultiFab&      f_mf,
+                    const amrex::Geometry& geom,
+                    int&                  step,
+                    amrex::Real&          time)
 {
     BL_PROFILE("readCheckpoint()");
 
@@ -73,10 +75,37 @@ void readCheckpoint(const std::string& dir_name,
     if (version != kCheckpointVersion) {
         amrex::Abort("readCheckpoint: unrecognized checkpoint version in " + dir_name);
     }
-    hdr >> step;
-    hdr >> time;
 
-    amrex::VisMF::Read(f_mf, dir_name + "/f");
+    amrex::Box domain;
+    int ncomp = 0;
+    hdr >> step >> time >> domain >> ncomp;
+    if (!hdr) {
+        amrex::Abort("readCheckpoint: malformed Header in " + dir_name);
+    }
+
+    if (domain != geom.Domain()) {
+        std::ostringstream msg;
+        msg << "readCheckpoint: domain mismatch. " << dir_name << " was written for " << domain
+            << " but this run has " << geom.Domain() << " (check grid.ncells)";
+        amrex::Abort(msg.str());
+    }
+    if (ncomp != f_mf.nComp()) {
+        std::ostringstream msg;
+        msg << "readCheckpoint: " << dir_name << " holds " << ncomp
+            << " distribution components but this run needs " << f_mf.nComp()
+            << " (check lbm.lattice_type)";
+        amrex::Abort(msg.str());
+    }
+
+    // Read with the checkpoint's own layout, then copy valid cells into f_mf.
+    amrex::MultiFab tmp;
+    amrex::VisMF::Read(tmp, dir_name + "/f");
+    if (tmp.nComp() != ncomp || tmp.boxArray().minimalBox() != domain ||
+        tmp.boxArray().numPts() != static_cast<amrex::Long>(domain.numPts())) {
+        amrex::Abort("readCheckpoint: data in " + dir_name + "/f does not cover the domain (incomplete checkpoint?)");
+    }
+    f_mf.setVal(amrex::Real(0.0), 0, ncomp, f_mf.nGrowVect());
+    f_mf.ParallelCopy(tmp, 0, 0, ncomp);
 
     amrex::Print() << "Checkpoint: read " << dir_name
                    << "  step=" << step << "  time=" << time << "\n";
