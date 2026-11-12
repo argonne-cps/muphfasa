@@ -18,8 +18,8 @@ TOP := ../../..
 
 DIM ?= 2
 
-EBASE = test_tgv2d
+EBASE = test_tgv
 
-CEXE_sources += test_tgv2d.cpp
+CEXE_sources += main.cpp
 
 include $(TOP)/Make.muphfasa

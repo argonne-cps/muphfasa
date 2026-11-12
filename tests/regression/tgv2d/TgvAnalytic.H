@@ -10,7 +10,7 @@
 //   rho(x,y,t) = 1 - (u0^2/(4*cs2)) * (cos(2*k*x) + cos(2*k*y)) * exp(-4*nu*k^2*t)
 //
 // Used by both InitData.cpp (t=0 initial condition, where nu drops out of
-// the decay factor entirely) and test_tgv2d.cpp (comparison against the
+// the decay factor entirely) and main.cpp (comparison against the
 // solver's output at any later time).
 
 #ifndef MUPHFASA_TGV_ANALYTIC_H
@@ -46,6 +46,28 @@ inline amrex::Real exactRho(amrex::Real x, amrex::Real y, amrex::Real k, amrex::
     return amrex::Real(1.0) -
            (u0 * u0 / (amrex::Real(4.0) * kCs2)) *
            (std::cos(amrex::Real(2.0) * k * x) + std::cos(amrex::Real(2.0) * k * y)) * decay2;
+}
+
+
+// Fills analytic_vel/analytic_rho with the TGV solution at lattice time t.
+inline void calcAnalytic(amrex::MultiFab& analytic_rho, amrex::MultiFab& analytic_vel,
+                  amrex::Real k, amrex::Real u0, amrex::Real nu, amrex::Real t)
+{
+    for (amrex::MFIter mfi(analytic_rho); mfi.isValid(); ++mfi) {
+        const amrex::Box& bx = mfi.validbox();
+        amrex::Array4<amrex::Real> const& r = analytic_rho.array(mfi);
+        amrex::Array4<amrex::Real> const& u = analytic_vel.array(mfi);
+
+        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int kc) {
+            const amrex::Real x = amrex::Real(i) + amrex::Real(0.5);
+            const amrex::Real y = amrex::Real(j) + amrex::Real(0.5);
+            amrex::Real ux, uy;
+            tgv::exactUV(x, y, k, u0, nu, t, ux, uy);
+            r(i, j, kc, 0) = tgv::exactRho(x, y, k, u0, nu, t);
+            u(i, j, kc, 0) = ux;
+            u(i, j, kc, 1) = uy;
+        });
+    }
 }
 
 }} // namespace muphfasa::tgv

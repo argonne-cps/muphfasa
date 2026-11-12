@@ -10,8 +10,7 @@ resolutions every run is stopped at the same dimensionless decay time
 nu*k^2*t -- since k^2 ~ 1/N^2, this is the standard LBM "diffusive scaling"
 refinement: the number of steps needed grows as N^2.
 
-Each run writes a matching plt<step>/analytic_plt<step> pair (already done
-by test_tgv2d.cpp); this script diffs that pair with AMReX's fcompare tool
+Each run writes a matching plt<step>/analytic_plt<step> pair; this script diffs that pair with AMReX's fcompare tool
 and fits the observed order of accuracy from the inf-norm error on vx and vy
 across consecutive doublings of N. (Unlike plane Couette, neither velocity
 component is trivially zero for TGV, so both are tracked.)

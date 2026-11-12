@@ -4,7 +4,7 @@ Doubly-periodic NxN domain seeded with the classic 2-D Taylor-Green vortex:
 one counter-rotating vortex pair per side, decaying exponentially under
 viscous dissipation. `InitData.cpp` (this directory) overrides the solver's
 default quiescent `initData()` to set the exact analytic solution at t=0;
-`test_tgv2d.cpp` then compares the solver's evolution against the same
+`main.cpp` then compares the solver's evolution against the same
 analytic solution at later times. See `TgvAnalytic.H` for the closed-form
 density/velocity fields this relies on.
 

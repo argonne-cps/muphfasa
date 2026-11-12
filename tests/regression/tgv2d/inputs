@@ -1,7 +1,7 @@
 # Regression test: 2-D Taylor-Green vortex decay.
 # Doubly-periodic NxN domain, one vortex pair per side (see TgvAnalytic.H).
 # InitData.cpp (this directory) sets the initial condition to the exact
-# solution at t=0; test_tgv2d.cpp compares the solver's evolution against
+# solution at t=0; main.cpp compares the solver's evolution against
 # the exact solution at later times.
 
 # ── Grid ──────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ lbm.tau          = 0.8      # pinned directly: nu_lat = (tau-0.5)*cs2 = 0.1
 # exact value has no effect here, since lbm.tau is pinned directly above --
 # see src/LBM/Units.cpp. units.ref_velocity doubles as the TGV vortex
 # amplitude u0 (read via InputParser::refVelocity() by both InitData.cpp and
-# test_tgv2d.cpp), in lattice units.
+# main.cpp), in lattice units.
 units.ref_length    = 1.0
 units.ref_velocity  = 0.005
 units.Re            = 10

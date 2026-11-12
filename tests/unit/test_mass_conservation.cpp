@@ -2,7 +2,7 @@
 // All walls NoSlip (bounce-back), quiescent init (rho=1, u=0), N advance() steps.
 // Total mass (sum rho over valid cells) must be conserved to ~1e-12.
 //
-// This mirrors the regression drivers in tests/regression/tgv2d/test_tgv2d.cpp
+// This mirrors the regression drivers in tests/regression/tgv2d/main.cpp
 // and tests/regression/couette/test_couette.cpp:
 //   InputParser params; auto sim = makeSimulation(params); sim->initialize();
 //   for (step) { sim->advance(); sim->writeOutput(step); }

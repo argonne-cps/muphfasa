@@ -1,4 +1,4 @@
-// test_tgv2d.cpp — Regression test: 2-D Taylor-Green vortex decay.
+// main.cpp — Regression test: 2-D Taylor-Green vortex decay.
 //
 // Uses the normal InputParser/ISimulation/advance() machinery (see
 // tests/regression/couette/test_couette.cpp, which this mirrors) with the
@@ -25,31 +25,6 @@
 #include <AMReX_Print.H>
 
 using namespace muphfasa;
-
-namespace {
-
-// Fills analytic_vel/analytic_rho with the TGV solution at lattice time t.
-void calcAnalytic(amrex::MultiFab& analytic_rho, amrex::MultiFab& analytic_vel,
-                  amrex::Real k, amrex::Real u0, amrex::Real nu, amrex::Real t)
-{
-    for (amrex::MFIter mfi(analytic_rho); mfi.isValid(); ++mfi) {
-        const amrex::Box& bx = mfi.validbox();
-        amrex::Array4<amrex::Real> const& r = analytic_rho.array(mfi);
-        amrex::Array4<amrex::Real> const& u = analytic_vel.array(mfi);
-
-        amrex::ParallelFor(bx, [=] AMREX_GPU_DEVICE(int i, int j, int kc) {
-            const amrex::Real x = amrex::Real(i) + amrex::Real(0.5);
-            const amrex::Real y = amrex::Real(j) + amrex::Real(0.5);
-            amrex::Real ux, uy;
-            tgv::exactUV(x, y, k, u0, nu, t, ux, uy);
-            r(i, j, kc, 0) = tgv::exactRho(x, y, k, u0, nu, t);
-            u(i, j, kc, 0) = ux;
-            u(i, j, kc, 1) = uy;
-        });
-    }
-}
-
-} // namespace
 
 int main(int argc, char* argv[])
 {
@@ -96,7 +71,7 @@ int main(int argc, char* argv[])
                                              sim_vel.nComp(), sim_vel.nGrow());
 
                 // calc analytic soln in lattice units
-                calcAnalytic(analytic_rho, analytic_vel, k, u0_lat, nu, sim->time());
+                tgv::calcAnalytic(analytic_rho, analytic_vel, k, u0_lat, nu, sim->time());
                 // convert analytic (and sim copies) to physical for fcompare and error
                 sim->units().toPhysical(analytic_rho, analytic_vel);
                 const amrex::Real t_phys = sim->units().toPhysicalTime(sim->time());
