@@ -31,6 +31,10 @@ public:
 
     virtual amrex::Real time() const noexcept = 0;
 
+    // First step index the main loop should run: 0 for a fresh start, or the
+    // step after the checkpoint's when restarting (amr.restart).
+    virtual int startStep() const noexcept = 0;
+
     // BGK relaxation parameter actually in use (omega = 1/tau), derived from
     // UnitConverter::relaxationTime<LatticeTag>() -- see SimulationImpl's
     // constructor.

@@ -90,6 +90,12 @@ public:
     int         checkpointInterval() const;
     std::string plotfilePrefix()     const;
     std::string checkpointPrefix()   const;
+
+    // amr.restart = <checkpoint directory>: resume from a checkpoint written
+    // by writeCheckpoint (e.g. chk0001000). Empty string -> fresh start.
+    // sim.max_step stays an absolute step count, so a restart from step S
+    // runs steps S+1 .. max_step.
+    std::string restartFile()        const;
 };
 
 } // namespace muphfasa

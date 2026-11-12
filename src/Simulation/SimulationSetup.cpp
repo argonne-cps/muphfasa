@@ -94,10 +94,26 @@ SimulationImpl<LatticeTag, CollisionModel>::~SimulationImpl() = default;
 template <typename LatticeTag, typename CollisionModel>
 void SimulationImpl<LatticeTag, CollisionModel>::initialize()
 {
-    // Restart support needs a restart-file key on InputParser, which doesn't
-    // exist yet; always start fresh for now.
-    setInitialConditions();
+    const std::string restart = m_params.restartFile();
+    if (restart.empty()) {
+        setInitialConditions();
+    } else {
+        restartFromCheckpoint(restart);
+    }
     fillGhostCells();
+}
+
+template <typename LatticeTag, typename CollisionModel>
+void SimulationImpl<LatticeTag, CollisionModel>::restartFromCheckpoint(const std::string& dir_name)
+{
+    int chk_step = 0;
+    amrex::Real chk_time = amrex::Real(0.0);
+    readCheckpoint(dir_name, m_fin, m_geom, chk_step, chk_time);
+
+    // The checkpoint was written after advance() at loop step chk_step, so
+    // that step is complete: resume with the next one.
+    m_time = chk_time;
+    m_start_step = chk_step + 1;
 }
 
 template <typename LatticeTag, typename CollisionModel>

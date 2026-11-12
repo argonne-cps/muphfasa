@@ -1,6 +1,7 @@
-# CMakeLists for muphfasa's standalone helper tools (tools/).
-# Enabled with -Dmuphfasa_BUILD_TOOLS=ON; needs only the unit converter and
-# input parser, not the full solver.
+# CMakeLists for muphfasa's standalone helper utilities (util/).
+# Enabled with -Dmuphfasa_BUILD_UTIL=ON; needs only the unit converter and
+# input parser, not the full solver. GNUMake users: see
+# util/input_checker/GNUmakefile.
 
 add_executable(muphfasa_inputinfo
     input_checker/inputinfo.cpp

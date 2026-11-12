@@ -44,6 +44,11 @@ namespace lim = muphfasa::unit_limits;
 // default, and a tau that leaves some margin above the ideal lower bound.
 constexpr Real kTauComfort = Real(0.7);
 
+// VisMF/plotfile metadata overhead, fitted to measured output. Per box: a FAB
+// header plus a min/max table row per component. Small next to the data.
+constexpr double kBoxBytes = 130, kBoxBytesPerComp = 50;
+constexpr double kPlotHeaderBytes = 600, kChkHeaderBytes = 100;
+
 #if defined(__GNUC__)
 __attribute__((format(printf, 1, 2)))
 #endif
@@ -131,7 +136,7 @@ std::vector<int> scaledCells(const std::vector<int>& N, Real f)
 
 std::string humanBytes(double b)
 {
-    const char* unit[] = {"B", "kB", "MB", "GB", "TB"};
+    const char* unit[] = {"B", "KiB", "MiB", "GiB", "TiB"};
     int i = 0;
     while (b >= 1024.0 && i < 4) { b /= 1024.0; ++i; }
     return fmt("%.3g %s", b, unit[i]);
@@ -487,17 +492,46 @@ int run(const std::string& input_file)
     }
     const Real bc_ratio = bc_speed_max / Uref;
 
-    // ---- time stepping ----
-    // main.cpp loops step = 0..max_step inclusive: max_step + 1 advances.
+    // ---- time stepping (mirrors the loop in src/main.cpp) ----
+    // for step = start..max_step: stop if 0 < stop_time_lat < t_lat, else advance
+    // (t_lat -> step+1) and write output. A fresh run starts at step 0, so max_step
+    // gives max_step + 1 advances, and stop_time ends the run after the first
+    // advance with t_lat > stop_time_lat. max_step / stop_time are absolute, so a
+    // restart (below) only changes where the loop starts.
     const std::int64_t adv_maxstep = static_cast<std::int64_t>(maxStep) + 1;
+    const Real stop_lat = units.toLatticeTime(stopTime);
     const bool has_stop = stopTime > Real(0);
-    std::int64_t adv_stop = 0;
-    if (has_stop && dt_ok) {
-        adv_stop = static_cast<std::int64_t>(std::ceil(stopTime / dt * (1.0 - 1e-12)));
-    }
-    const bool stop_first = has_stop && dt_ok && adv_stop < adv_maxstep;
+    const bool stop_active = dt_ok && std::isfinite(stop_lat) && stop_lat > Real(0);
+    const std::int64_t adv_stop = stop_active ? static_cast<std::int64_t>(std::floor(stop_lat)) + 1 : 0;
+    const bool stop_first = stop_active && adv_stop < adv_maxstep;
+    const bool limits_tie = stop_active && adv_stop == adv_maxstep;
     const std::int64_t n_adv = stop_first ? adv_stop : adv_maxstep;
     const std::int64_t last_step = std::max<std::int64_t>(n_adv - 1, 0);
+
+    // ---- restart (amr.restart): the loop resumes at the checkpoint's step + 1 ----
+    // Only the Header's version/step/time lines are read; the solver itself
+    // validates the domain and lattice against the checkpoint.
+    const std::string restartDir = params.restartFile();
+    bool restart_found = false;
+    std::int64_t first_step = 0;
+    double restart_time = 0.0;
+    if (!restartDir.empty()) {
+        std::ifstream hdr(restartDir + "/Header");
+        std::string version;
+        std::int64_t chk_step = 0;
+        double chk_time = 0.0;
+        if ((hdr >> version >> chk_step >> chk_time) && version.rfind("muphfasa_checkpoint_", 0) == 0) {
+            restart_found = true;
+            first_step = chk_step + 1;
+            restart_time = chk_time;
+        } else {
+            adv.push_back({true, fmt("amr.restart = \"%s\": no readable checkpoint Header found; the solver aborts.",
+                                     restartDir.c_str()),
+                           {"The path is relative to the directory the solver is run from "
+                            "(and this tool: run it from the same directory)."}});
+        }
+    }
+    const std::int64_t n_run = std::max<std::int64_t>(n_adv - first_step, 0);
 
     // ---- memory estimate (two f copies + rho + vel, ghost cells per box) ----
     double cells = 1.0, cells_ghost = 1.0, boxes = 1.0;
@@ -564,33 +598,110 @@ int run(const std::string& input_file)
     section("Time stepping (estimate)");
     row("sim.max_step", fmt("%d  ->  loop runs steps 0..%d = %lld advances", maxStep, maxStep,
                             static_cast<long long>(adv_maxstep)));
-    if (has_stop) {
-        row("sim.stop_time", dt_ok ? fmt("%.6g s  ->  %lld advances", stopTime, static_cast<long long>(adv_stop))
-                                   : fmt("%.6g s  (dt not positive; cannot convert)", stopTime));
+    if (stop_active) {
+        row("sim.stop_time", fmt("%.6g s = %.6g lattice  ->  loop breaks after %lld advances",
+                                 stopTime, stop_lat, static_cast<long long>(adv_stop)));
+    } else if (has_stop) {
+        row("sim.stop_time", fmt("%.6g s  (dt not positive; cannot convert)", stopTime));
     } else {
         row("sim.stop_time", fmt("%.6g  (disabled; <= 0)", stopTime));
     }
-    row("limit hit first", stop_first ? "sim.stop_time" : "sim.max_step");
+    row("limit hit first", stop_first ? "sim.stop_time" : (limits_tie ? "both (same step)" : "sim.max_step"));
     row("total", fmt("%lld steps (last step index %lld)", static_cast<long long>(n_adv),
                      static_cast<long long>(last_step)));
+    if (!restartDir.empty()) {
+        row("amr.restart", restart_found
+                ? fmt("%s  (step %lld, lattice t = %.6g)", restartDir.c_str(),
+                      static_cast<long long>(first_step - 1), restart_time)
+                : fmt("%s  (no readable checkpoint found)", restartDir.c_str()));
+        if (restart_found) {
+            row("this run", n_run > 0
+                    ? fmt("resumes at step %lld: %lld of %lld advances remain", static_cast<long long>(first_step),
+                          static_cast<long long>(n_run), static_cast<long long>(n_adv))
+                    : std::string("nothing to do: the checkpoint is already at or past the end of the run"));
+        }
+    }
     if (dt_ok) {
         row("end time", fmt("t = %.6g s  (lattice t = %lld)", n_adv * dt, static_cast<long long>(n_adv)));
         row("flow-throughs", fmt("%.4g  (end time * U_ref / L_domain)", n_adv * dt * Uref / units.domainLength()));
     } else {
         row("end time", "unavailable (dt is not positive)");
     }
-    auto outputCount = [&](int interval) -> std::int64_t { return interval > 0 ? last_step / interval + 1 : 0; };
+    // Outputs written by this run: steps first_step..last_step that are multiples of interval.
+    auto outputCount = [&](int interval) -> std::int64_t {
+        if (interval <= 0 || (first_step > 0 && last_step < first_step)) { return 0; }
+        return first_step > 0 ? last_step / interval - (first_step - 1) / interval : last_step / interval + 1;
+    };
     row("plotfiles", plotInt > 0 ? fmt("%lld  (every %d steps, prefix \"%s\")",
                                        static_cast<long long>(outputCount(plotInt)), plotInt, plotPrefix.c_str())
                                  : "disabled (amr.plot_int <= 0)");
     row("checkpoints", chkInt > 0 ? fmt("%lld  (every %d steps, prefix \"%s\")",
                                         static_cast<long long>(outputCount(chkInt)), chkInt, chkPrefix.c_str())
                                   : "disabled (amr.chk_int <= 0)");
-    if (has_stop) {
-        adv.push_back({false, "sim.stop_time is read by InputParser but not applied by the solver.",
-                       {"src/main.cpp loops to sim.max_step only, so a real run always stops at max_step. "
-                        "The estimate above shows which limit would trigger first if stop_time were honoured."}});
+
+    // ---- disk usage ----
+    // Sizes of the file contents (not rounded up to filesystem blocks). Every
+    // output gets a fresh directory (step number in the name), so they accumulate.
+    //   plotfile  : rho + velocity (1 + D components), valid cells, no ghosts
+    //   checkpoint: all Q distributions of f, including ghost cells of every box
+    // plus VisMF per-box FAB headers / min-max tables and the small Header files.
+    // fab.format (AMReX) sets the on-disk precision of plotfile FABs: NATIVE =
+    // sizeof(Real), NATIVE_32 and IEEE32 = 4 bytes. IEEE/ASCII/8BIT pass AMReX's
+    // startup check but VisMF aborts on the first plotfile write; any other
+    // string aborts at startup. writeCheckpoint() overrides the format to NATIVE
+    // for its own write, so checkpoints are always sizeof(Real) per value.
+    std::string fabFmt = "NATIVE";
+    {
+        amrex::ParmParse ppfab("fab");
+        ppfab.query("format", fabFmt);
     }
+    double plot_elem_bytes = sizeof(Real);
+    bool plot_writable = true;
+    if (fabFmt == "NATIVE_32" || fabFmt == "IEEE32") {
+        plot_elem_bytes = 4;
+    } else if (fabFmt == "IEEE" || fabFmt == "ASCII" || fabFmt == "8BIT") {
+        plot_writable = false;
+    } else if (fabFmt != "NATIVE") {
+        throw std::runtime_error(fmt("fab.format = \"%s\" is not a valid AMReX format "
+                                     "(use NATIVE, NATIVE_32 or IEEE32).", fabFmt.c_str()));
+    }
+    const double chk_elem_bytes = sizeof(Real);
+    if (!plot_writable && plotInt > 0) {
+        adv.push_back({true, fmt("fab.format = %s cannot be written by VisMF; the solver aborts at the first "
+                                 "plotfile write.", fabFmt.c_str()),
+                       {"Use NATIVE (double) or NATIVE_32 / IEEE32 (single precision), or disable "
+                        "plotfiles with amr.plot_int = 0. Checkpoints are unaffected: they are always "
+                        "written in NATIVE."}});
+    }
+
+    const int plot_ncomp = 1 + D;
+    const double plot_bytes = plot_elem_bytes * plot_ncomp * cells
+                            + boxes * (kBoxBytes + kBoxBytesPerComp * plot_ncomp) + kPlotHeaderBytes;
+    const double chk_bytes = chk_elem_bytes * lat.Q * cells_ghost
+                           + boxes * (kBoxBytes + kBoxBytesPerComp * lat.Q) + kChkHeaderBytes;
+    const std::int64_t n_plot = outputCount(plotInt);
+    const std::int64_t n_chk = outputCount(chkInt);
+    section("Disk usage (estimate)");
+    row("fab.format", plot_writable
+            ? fmt("%s  (plotfiles: %d bytes/value; checkpoints always NATIVE: %d)", fabFmt.c_str(),
+                  static_cast<int>(plot_elem_bytes), static_cast<int>(chk_elem_bytes))
+            : fmt("%s  (unsupported for plotfiles; checkpoints always NATIVE)", fabFmt.c_str()));
+    row("per plotfile", !plot_writable ? (plotInt > 0 ? "n/a (fab.format cannot be written)" : "n/a (plotfiles disabled)")
+            : plotInt > 0
+            ? fmt("~%s  (%d comps: rho, u; valid cells only)", humanBytes(plot_bytes).c_str(), plot_ncomp)
+            : "n/a (plotfiles disabled)");
+    if (lat.valid) {
+        row("per checkpoint", chkInt > 0
+                ? fmt("~%s  (%d distributions incl. %d ghost layer)", humanBytes(chk_bytes).c_str(), lat.Q, lat.nGhost)
+                : "n/a (checkpoints disabled)");
+    } else {
+        row("per checkpoint", "unknown (lattice not available in this build)");
+    }
+    const double plot_total = (plotInt > 0 && plot_writable) ? static_cast<double>(n_plot) * plot_bytes : 0.0;
+    const double chk_total = (chkInt > 0 && lat.valid) ? static_cast<double>(n_chk) * chk_bytes : 0.0;
+    row("plot total", fmt("~%s  (%lld files)", humanBytes(plot_total).c_str(), static_cast<long long>(plotInt > 0 ? n_plot : 0)));
+    row("checkpoint total", fmt("~%s  (%lld files)", humanBytes(chk_total).c_str(), static_cast<long long>(chkInt > 0 ? n_chk : 0)));
+    row("total", fmt("~%s", humanBytes(plot_total + chk_total).c_str()));
 
     // ---- tau / u_lat range analysis ----
     checkLatticeParams({units, lat.cs2, bc_ratio, pinned, ncells, D, static_cast<Real>(n_adv)}, adv);
@@ -643,11 +754,17 @@ int main(int argc, char* argv[])
 
     // Quiet AMReX banner, and turn Abort/Assert/ParmParse failures into
     // exceptions so bad input prints a message instead of a backtrace.
-    amrex::Initialize(argc, argv, std::function<void()>([] {
-        amrex::ParmParse pp("amrex");
-        pp.add("verbose", 0);
-        pp.add("throw_exception", 1);
-    }));
+    try {
+        amrex::Initialize(argc, argv, std::function<void()>([] {
+            amrex::ParmParse pp("amrex");
+            pp.add("verbose", 0);
+            pp.add("throw_exception", 1);
+        }));
+    } catch (const std::exception&) {
+        std::cerr << "ERROR: AMReX rejected the input file during startup (see the message above;\n"
+                     "       valid fab.format values are NATIVE, NATIVE_32 and IEEE32).\n";
+        return 1;
+    }
     int rc = 0;
     try {
         rc = run(input_file);

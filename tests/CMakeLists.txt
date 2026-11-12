@@ -38,6 +38,7 @@ set(UNIT_TEST_NAMES
     test_bc_corners
     test_mass_conservation
     test_forcing
+    test_restart
 )
 
 foreach(test_name IN LISTS UNIT_TEST_NAMES)
