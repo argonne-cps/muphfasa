@@ -5,8 +5,8 @@ TOP := ../../..
 
 DIM ?= 2
 
-EBASE = test_lid2d
+EBASE = test_lid
 
-CEXE_sources += test_lid2d.cpp
+CEXE_sources += main.cpp
 
 include $(TOP)/Make.muphfasa

@@ -1,7 +1,7 @@
 """helper.py — Shared helpers for the lid2d convergence / plotting scripts.
 
 Both convergence.py and plot_lid2d.py drive test_lid2d with the opt-in
-diagnostics added to test_lid2d.cpp:
+diagnostics added to main.cpp:
 
     lid2d.csv_prefix=<p>   writes <p>_history.csv and <p>_centerline.csv
     lid2d.sample_int=<n>   diagnostic sampling interval in steps
@@ -24,12 +24,12 @@ REPO_ROOT = LID2D_DIR.parents[2]
 
 # Marchi, Suero & Araki (2009), doi:10.1590/S1678-58782009000300004: grid-converged
 # Re=100 centerline extrema normalized by the lid velocity (same values as
-# test_lid2d.cpp; see README.md).
+# main.cpp; see README.md).
 BENCH = {"umin": -2.140417e-1, "vmax": 1.79572814e-1, "vmin": -2.53804e-1}
 
 BUILD_HELP = (
     "Build a 2-D test_lid2d first, e.g.\n"
-    "    cd tests/regression/lid2d && make -j DIM=2          # -> test_lid2d2d.gnu.ex\n"
+    "    cd tests/regression/lid2d && make -j DIM=2          # -> test_lid2d.gnu.ex\n"
     "or\n"
     "    cmake -S . -B /tmp/build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON\n"
     "    cmake --build /tmp/build2d -j --target test_lid2d\n"
@@ -46,7 +46,7 @@ def find_solver(explicit=None) -> Path:
         if not exe.is_file():
             raise FileNotFoundError(f"solver executable not found: {exe}")
         return exe
-    candidates = sorted(LID2D_DIR.glob("test_lid2d*2d*.ex")) + sorted(
+    candidates = sorted(LID2D_DIR.glob("test_lid2d*.ex")) + sorted(
         REPO_ROOT.glob("build*/tests/test_lid2d"))
     if not candidates:
         raise FileNotFoundError("no test_lid2d executable found.\n" + BUILD_HELP)

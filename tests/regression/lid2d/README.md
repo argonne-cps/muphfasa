@@ -3,7 +3,7 @@
 Correctness test for the 2-D lid-driven cavity (same physics as `lid_driven_cavity`:
 closed square cavity, NoSlip x-lo/x-hi/y-lo, `MovingWall` lid at y-hi, Re=100,
 D2Q9, N=64). The case has no closed-form solution, so instead of an
-`fcompare`-vs-analytic test (like `beltrami3d`) `test_lid2d.cpp` runs the
+`fcompare`-vs-analytic test (like `couette`) `main.cpp` runs the
 cavity from rest to steady state and checks global invariants plus three centerline
 extrema against a converged literature benchmark (the grid-convergence order is checked by
 `convergence.py`). It prints PASS/FAIL per check and
@@ -15,8 +15,8 @@ This test is 2-D only (`D2Q9`, `inputs`; N=64, ~3 s on one core).
 
 ```sh
 # GNUMake (from this directory — DIM=2)
-make -j6 DIM=2          # -> test_lid2d2d.gnu.ex
-./test_lid2d2d.gnu.ex inputs
+make -j6 DIM=2          # -> test_lid2d.gnu.ex
+./test_lid2d.gnu.ex inputs
 
 # CMake (from repo root)
 cmake -S . -B build2d -Dmuphfasa_DIM=2 -Dmuphfasa_BUILD_TESTS=ON

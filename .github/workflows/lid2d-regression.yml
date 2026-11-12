@@ -77,7 +77,7 @@ jobs:
         # ~2 s. Exits non-zero if any check fails: mass drift, KE spin-up /
         # plateau, energy balance, or an extremum more than 1% from the
         # Marchi et al. (2009) benchmark.
-        run: ./test_lid2d2d.gnu.ex inputs
+        run: ./test_lid2d.gnu.ex inputs
 
       - name: Grid-convergence study
         working-directory: tests/regression/lid2d

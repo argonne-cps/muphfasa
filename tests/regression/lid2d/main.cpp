@@ -1,4 +1,4 @@
-// test_lid2d.cpp — Correctness test: 2-D lid-driven cavity, global checks.
+// main.cpp — Correctness test: 2-D lid-driven cavity, global checks.
 //
 // Runs the closed square cavity of ../inputs.bench from rest to steady state
 // and checks, in lattice units straight off sim->vel()/sim->rho():
